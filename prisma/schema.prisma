@@ -263,3 +263,19 @@ model ConsignmentItem {
 
   @@map("consignment_items")
 }
+
+// ============================================
+// AUDITORIA E LOG DE AÇÕES (RECONHECEDOR DE MOVIMENTOS)
+// ============================================
+
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  userName    String   @map("user_name")
+  userEmail   String   @map("user_email")
+  actionType  String   @map("action_type") // CRIAR, ATUALIZAR, EXCLUIR, CONCLUIR
+  module      String   // ESTOQUE, PRODUTOS, PRODUCAO, MAQUINAS, VENDAS, FINANCEIRO, USUARIOS
+  description String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("activity_logs")
+}

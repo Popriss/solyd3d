@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { logAction } from '@/lib/activityLogger';
 
 export async function GET() {
   try {
@@ -57,9 +58,33 @@ export async function POST(request) {
       },
     });
 
+    await logAction({ actionType: 'CRIAR', module: 'USUARIOS', description: `Cadastrou novo login para ${newUser.name} (${newUser.email} -> ${newUser.role})` });
+
     return NextResponse.json(newUser, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao cadastrar novo usuário.' }, { status: 500 });
+  }
+}
+
+export async function PUT(request) {
+  try {
+    const body = await request.json();
+    const { id, role, name } = body;
+    if (!id) return NextResponse.json({ error: 'ID do usuário é obrigatório' }, { status: 400 });
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(role ? { role: role === 'ADMIN' ? 'ADMIN' : 'USER' } : {}),
+        ...(name ? { name: name.trim() } : {}),
+      },
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    await logAction({ actionType: 'ATUALIZAR', module: 'USUARIOS', description: `Atualizou permissões do usuário ${updated.name} (${updated.email} -> ${updated.role})` });
+    return NextResponse.json(updated);
+  } catch (error) {
+    return NextResponse.json({ error: 'Erro ao atualizar usuário.' }, { status: 500 });
   }
 }
 
@@ -88,6 +113,8 @@ export async function DELETE(request) {
     await prisma.user.delete({
       where: { id },
     });
+
+    await logAction({ actionType: 'EXCLUIR', module: 'USUARIOS', description: `Excluiu o login de ${userToDelete.name} (${userToDelete.email})` });
 
     return NextResponse.json({ success: true });
   } catch (error) {

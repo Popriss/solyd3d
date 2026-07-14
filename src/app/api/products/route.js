@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { calculateCostPerGram, calculateSuggestedPrice, calculateMaterialCost, calculateEnergyCost, calculateTotalCost } from '@/lib/calculations';
+import { logAction } from '@/lib/activityLogger';
 
 export async function GET() {
   try {
@@ -43,6 +44,7 @@ export async function POST(request) {
         imageUrl: imageUrl || null,
       },
     });
+    await logAction({ actionType: 'CRIAR', module: 'PRODUTOS', description: `Cadastrou peça/produto no catálogo: ${product.name}` });
     return NextResponse.json(product, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao criar produto' }, { status: 500 });
@@ -58,6 +60,7 @@ export async function PUT(request) {
     if (data.estimatedPrintMinutes) data.estimatedPrintMinutes = Number(data.estimatedPrintMinutes);
     if (data.profitMarginPct) data.profitMarginPct = Number(data.profitMarginPct);
     const product = await prisma.product.update({ where: { id: Number(id) }, data });
+    await logAction({ actionType: 'ATUALIZAR', module: 'PRODUTOS', description: `Atualizou produto #${product.id} (${product.name})` });
     return NextResponse.json(product);
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao atualizar produto' }, { status: 500 });
@@ -70,6 +73,7 @@ export async function DELETE(request) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
     await prisma.product.delete({ where: { id: Number(id) } });
+    await logAction({ actionType: 'EXCLUIR', module: 'PRODUTOS', description: `Removeu peça/produto ID #${id}` });
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao remover produto' }, { status: 500 });

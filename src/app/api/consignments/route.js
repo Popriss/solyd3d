@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { logAction } from '@/lib/activityLogger';
 
 // GET - Listar todas as consignações/remessas
 export async function GET(request) {
@@ -97,6 +98,8 @@ export async function POST(request) {
 
       return created;
     });
+
+    await logAction({ actionType: 'CRIAR', module: 'VENDAS', description: `Criou remessa de consignação #${consignment.id} com ${itemsData.length} itens` });
 
     return NextResponse.json(consignment, { status: 201 });
   } catch (error) {
@@ -212,6 +215,8 @@ export async function PUT(request) {
       });
     });
 
+    await logAction({ actionType: 'CONCLUIR', module: 'VENDAS', description: `Realizou acerto da remessa #${updated.id} (${updated.salesPoint?.name || 'Banca'}) para status ${updated.status}` });
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error('PUT /api/consignments error:', error);
@@ -230,6 +235,7 @@ export async function DELETE(request) {
     }
 
     await prisma.consignment.delete({ where: { id: Number(id) } });
+    await logAction({ actionType: 'EXCLUIR', module: 'VENDAS', description: `Removeu remessa ID #${id}` });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/consignments error:', error);

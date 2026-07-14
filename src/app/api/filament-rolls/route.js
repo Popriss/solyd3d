@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { calculateCostPerGram, determineFilamentStatus } from '@/lib/calculations';
+import { logAction } from '@/lib/activityLogger';
 
 // GET - Listar todos os rolos
 export async function GET() {
@@ -41,6 +42,8 @@ export async function POST(request) {
       },
     });
 
+    await logAction({ actionType: 'CRIAR', module: 'ESTOQUE', description: `Cadastrou rolo de filamento: ${roll.material} ${roll.color} (${roll.brand})` });
+
     return NextResponse.json(roll, { status: 201 });
   } catch (error) {
     console.error('POST /api/filament-rolls error:', error);
@@ -73,6 +76,8 @@ export async function PUT(request) {
       data,
     });
 
+    await logAction({ actionType: 'ATUALIZAR', module: 'ESTOQUE', description: `Atualizou rolo de filamento #${roll.id} (${roll.material} ${roll.color})` });
+
     return NextResponse.json(roll);
   } catch (error) {
     console.error('PUT /api/filament-rolls error:', error);
@@ -91,6 +96,7 @@ export async function DELETE(request) {
     }
 
     await prisma.filamentRoll.delete({ where: { id: Number(id) } });
+    await logAction({ actionType: 'EXCLUIR', module: 'ESTOQUE', description: `Removeu rolo de filamento ID #${id}` });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/filament-rolls error:', error);

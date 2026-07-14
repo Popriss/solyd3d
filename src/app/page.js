@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import {
   DollarSign, TrendingUp, TrendingDown, Factory,
-  AlertTriangle, Boxes, Package, XCircle, BarChart3, PieChart as PieIcon, Activity
+  AlertTriangle, Boxes, Package, XCircle, BarChart3, PieChart as PieIcon, Activity, History
 } from 'lucide-react';
-import { formatCurrency, formatWeight } from '@/lib/formatters';
+import { formatCurrency, formatWeight, formatDate } from '@/lib/formatters';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend
@@ -57,6 +57,7 @@ export default function DashboardPage() {
   const prod = data?.production || {};
   const inv = data?.inventory || {};
   const charts = data?.charts || { dailyRevenue: [], topProducts: [], costBreakdown: [] };
+  const recentLogs = data?.recentLogs || [];
 
   return (
     <div className="page-container">
@@ -217,7 +218,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Production + Inventory Grid */}
-      <div className="grid-2">
+      <div className="grid-2" style={{ marginBottom: 24 }}>
         {/* Production Summary */}
         <div className="card">
           <div className="card-header">
@@ -272,6 +273,78 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Reconhecedor de Ações / Últimas Movimentações */}
+      <div className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <h3 className="card-title">
+            <History size={16} style={{ marginRight: 8, verticalAlign: 'middle', color: 'var(--accent-indigo)' }} />
+            Reconhecedor de Ações — Últimas Movimentações no Sistema
+          </h3>
+          <a href="/usuarios" style={{ fontSize: '0.82rem', color: 'var(--accent-indigo)', textDecoration: 'none', fontWeight: 600 }}>
+            Ver histórico completo de auditoria →
+          </a>
+        </div>
+        <div className="card-body">
+          {recentLogs.length === 0 ? (
+            <div className="empty-state" style={{ padding: 30 }}>
+              <Activity />
+              <div className="empty-state-title">Nenhuma ação registrada nas últimas horas</div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>As criações e atualizações feitas por qualquer usuário aparecerão instantaneamente aqui.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+              {recentLogs.map((item) => {
+                let badgeBg = 'rgba(99, 102, 241, 0.15)';
+                let badgeColor = 'var(--accent-indigo)';
+                if (item.actionType === 'CRIAR') { badgeBg = 'rgba(16, 185, 129, 0.15)'; badgeColor = 'var(--accent-emerald)'; }
+                if (item.actionType === 'EXCLUIR') { badgeBg = 'rgba(244, 63, 94, 0.15)'; badgeColor = '#F43F5E'; }
+                if (item.actionType === 'CONCLUIR') { badgeBg = 'rgba(59, 130, 246, 0.15)'; badgeColor = '#3B82F6'; }
+
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-primary)',
+                      borderRadius: 10,
+                      padding: 14,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span
+                        style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          background: badgeBg,
+                          color: badgeColor,
+                        }}
+                      >
+                        {item.actionType} • {item.module}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {formatDate(item.createdAt)}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                      {item.description}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 6 }}>
+                      Autor: <strong>{item.userName}</strong> ({item.userEmail})
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import {
   LayoutDashboard, Package, Boxes, Factory, DollarSign,
   Settings, Printer, Store, ShoppingBag, Users
@@ -19,12 +20,14 @@ const navItems = [
   { section: 'Financeiro' },
   { href: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { section: 'Sistema' },
-  { href: '/usuarios', label: 'Usuários & Acessos', icon: Users },
+  { href: '/usuarios', label: 'Usuários & Acessos', icon: Users, adminOnly: true },
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === 'ADMIN';
 
   return (
     <aside className="sidebar">
@@ -36,6 +39,9 @@ export default function Sidebar() {
         {navItems.map((item, i) => {
           if (item.section) {
             return <div key={i} className="sidebar-section-title">{item.section}</div>;
+          }
+          if (item.adminOnly && !isAdmin) {
+            return null;
           }
           const Icon = item.icon;
           const isActive = pathname === item.href ||

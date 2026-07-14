@@ -73,7 +73,7 @@ export default function LoginPage() {
             <input
               className="form-input"
               type="email"
-              placeholder="admin@solyd3d.com"
+              placeholder="seu.email@empresa.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -106,12 +106,10 @@ export default function LoginPage() {
 
         <div style={{
           marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-primary)',
-          fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'flex-start', gap: 8
+          fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
         }}>
-          <ShieldCheck size={16} style={{ color: 'var(--accent-emerald)', flexShrink: 0, marginTop: 1 }} />
-          <div>
-            <strong>Primeiro Acesso?</strong> Se o banco estiver vazio, entre com <code>admin@solyd3d.com</code> e senha <code>SenhaAdmin@2026</code> para criar a contabilidade master.
-          </div>
+          <ShieldCheck size={16} style={{ color: 'var(--accent-indigo)' }} />
+          <span>Ambiente monitorado e protegido com criptografia de ponta a ponta.</span>
         </div>
       </div>
     </div>

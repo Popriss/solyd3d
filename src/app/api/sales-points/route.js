@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { logAction } from '@/lib/activityLogger';
 
 // GET - Listar todos os pontos de venda com suas estatísticas agregadas
 export async function GET() {
@@ -74,6 +75,8 @@ export async function POST(request) {
       },
     });
 
+    await logAction({ actionType: 'CRIAR', module: 'VENDAS', description: `Cadastrou ponto de venda/banca: ${point.name}` });
+
     return NextResponse.json(point, { status: 201 });
   } catch (error) {
     console.error('POST /api/sales-points error:', error);
@@ -100,6 +103,8 @@ export async function PUT(request) {
       data,
     });
 
+    await logAction({ actionType: 'ATUALIZAR', module: 'VENDAS', description: `Atualizou ponto de venda #${updated.id} (${updated.name})` });
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error('PUT /api/sales-points error:', error);
@@ -118,6 +123,7 @@ export async function DELETE(request) {
     }
 
     await prisma.salesPoint.delete({ where: { id: Number(id) } });
+    await logAction({ actionType: 'EXCLUIR', module: 'VENDAS', description: `Removeu ponto de venda ID #${id}` });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/sales-points error:', error);

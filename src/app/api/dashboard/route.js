@@ -112,6 +112,12 @@ export async function GET() {
       { name: 'Despesas Variáveis', value: totalVariableExpenses, color: '#ec4899' },
     ].filter(item => item.value > 0);
 
+    // 8. ATIVIDADES RECENTES (RECONHECEDOR DE AÇÕES)
+    const recentLogs = await prisma.activityLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 6,
+    });
+
     return NextResponse.json({
       inventory: { totalRolls, lowStockRolls, lowStockCount: lowStockRolls.length },
       production: {
@@ -137,6 +143,7 @@ export async function GET() {
         topProducts,
         costBreakdown,
       },
+      recentLogs,
     });
   } catch (error) {
     console.error('GET /api/dashboard error:', error);

@@ -6,6 +6,7 @@ import {
   calculateTotalCost,
   determineFilamentStatus
 } from '@/lib/calculations';
+import { logAction } from '@/lib/activityLogger';
 
 // GET - Listar ordens de produção
 export async function GET() {
@@ -49,6 +50,8 @@ export async function POST(request) {
         machine: true,
       },
     });
+
+    await logAction({ actionType: 'CRIAR', module: 'PRODUCAO', description: `Criou ordem de produção #${order.id} (${order.product?.name || 'Peça 3D'})` });
 
     return NextResponse.json(order, { status: 201 });
   } catch (error) {
@@ -144,6 +147,8 @@ export async function PUT(request) {
       },
     });
 
+    await logAction({ actionType: status === 'COMPLETED' ? 'CONCLUIR' : 'ATUALIZAR', module: 'PRODUCAO', description: `Atualizou ordem de produção #${updatedOrder.id} (${updatedOrder.product?.name || 'Peça'}) para status ${updatedOrder.status}` });
+
     return NextResponse.json(updatedOrder);
   } catch (error) {
     console.error('PUT /api/production-orders error:', error);
@@ -162,6 +167,7 @@ export async function DELETE(request) {
     }
 
     await prisma.productionOrder.delete({ where: { id: Number(id) } });
+    await logAction({ actionType: 'EXCLUIR', module: 'PRODUCAO', description: `Removeu ordem de produção ID #${id}` });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/production-orders error:', error);

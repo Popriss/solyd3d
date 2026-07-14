@@ -22,8 +22,13 @@ export default withAuth(
         // Permitir acesso livre à tela de login e às rotas de autenticação
         if (isLogin || isApiAuth) return true;
 
-        // Para todas as outras rotas (páginas do ERP e APIs de dados), exigir token com role ADMIN
-        return !!token && token.role === 'ADMIN';
+        // Acesso restrito apenas para Administradores na rota e API de Usuários (/usuarios e /api/users)
+        if (req.nextUrl.pathname.startsWith('/usuarios') || req.nextUrl.pathname.startsWith('/api/users')) {
+          return !!token && token.role === 'ADMIN';
+        }
+
+        // Para todas as outras rotas do ERP, permitir acesso para qualquer usuário logado (USER ou ADMIN)
+        return !!token;
       },
     },
   }

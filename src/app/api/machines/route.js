@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { logAction } from '@/lib/activityLogger';
 
 export async function GET() {
   try {
@@ -27,6 +28,7 @@ export async function POST(request) {
         purchaseDate: new Date(purchaseDate || Date.now()),
       },
     });
+    await logAction({ actionType: 'CRIAR', module: 'MAQUINAS', description: `Cadastrou nova impressora 3D: ${machine.name} (${machine.powerWatts}W)` });
     return NextResponse.json(machine, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao criar máquina' }, { status: 500 });
@@ -44,6 +46,7 @@ export async function PUT(request) {
     if (data.powerWatts) data.powerWatts = Number(data.powerWatts);
     if (data.purchaseDate) data.purchaseDate = new Date(data.purchaseDate);
     const machine = await prisma.machine.update({ where: { id: Number(id) }, data });
+    await logAction({ actionType: 'ATUALIZAR', module: 'MAQUINAS', description: `Atualizou dados da impressora #${machine.id} (${machine.name})` });
     return NextResponse.json(machine);
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao atualizar máquina' }, { status: 500 });
@@ -56,6 +59,7 @@ export async function DELETE(request) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
     await prisma.machine.delete({ where: { id: Number(id) } });
+    await logAction({ actionType: 'EXCLUIR', module: 'MAQUINAS', description: `Removeu impressora 3D ID #${id}` });
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao remover máquina' }, { status: 500 });

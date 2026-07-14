@@ -1,0 +1,265 @@
+// Solyd3D — Mini-ERP para Impressão 3D
+// Schema do Banco de Dados PostgreSQL
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// AUTENTICAÇÃO
+// ============================================
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  role          Role     @default(PENDING)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  USER
+  PENDING
+}
+
+// ============================================
+// MÁQUINAS / IMPRESSORAS
+// ============================================
+
+model Machine {
+  id               Int      @id @default(autoincrement())
+  name             String
+  purchasePrice    Decimal  @map("purchase_price") @db.Decimal(10, 2)
+  installmentCount Int      @map("installment_count")
+  installmentValue Decimal  @map("installment_value") @db.Decimal(10, 2)
+  powerWatts       Decimal  @map("power_watts") @db.Decimal(8, 2)
+  purchaseDate     DateTime @map("purchase_date") @db.Date
+  status           MachineStatus @default(ACTIVE)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  productionOrders ProductionOrder[]
+  fixedExpenses    FixedExpense[]
+
+  @@map("machines")
+}
+
+enum MachineStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+}
+
+// ============================================
+// CONFIGURAÇÃO DE ENERGIA
+// ============================================
+
+model EnergyConfig {
+  id            Int      @id @default(autoincrement())
+  kwhPrice      Decimal  @map("kwh_price") @db.Decimal(10, 4)
+  utilityName   String?  @map("utility_name")
+  effectiveDate DateTime @map("effective_date") @db.Date
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("energy_configs")
+}
+
+// ============================================
+// ESTOQUE DE FILAMENTOS
+// ============================================
+
+model FilamentRoll {
+  id               Int       @id @default(autoincrement())
+  material         String    // PLA, ABS, PETG, TPU, Resin, etc.
+  color            String
+  brand            String
+  initialWeightG   Decimal   @map("initial_weight_g") @db.Decimal(10, 2)
+  remainingWeightG Decimal   @map("remaining_weight_g") @db.Decimal(10, 2)
+  costPerRoll      Decimal   @map("cost_per_roll") @db.Decimal(10, 2)
+  costPerGram      Decimal   @map("cost_per_gram") @db.Decimal(10, 4)
+  status           FilamentStatus @default(AVAILABLE)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  productionOrders ProductionOrder[]
+  variableExpenses VariableExpense[]
+
+  @@map("filament_rolls")
+}
+
+enum FilamentStatus {
+  AVAILABLE
+  LOW
+  EMPTY
+  RESERVED
+}
+
+// ============================================
+// CATÁLOGO DE PRODUTOS
+// ============================================
+
+model Product {
+  id                   Int      @id @default(autoincrement())
+  name                 String
+  description          String?  @db.Text
+  projectLink          String?  @map("project_link")
+  estimatedWeightG     Decimal  @map("estimated_weight_g") @db.Decimal(10, 2)
+  estimatedPrintMinutes Int     @map("estimated_print_minutes")
+  recommendedMaterial  String?  @map("recommended_material")
+  recommendedColor     String?  @map("recommended_color")
+  profitMarginPct      Decimal  @default(50) @map("profit_margin_pct") @db.Decimal(5, 2)
+  imageUrl             String?  @map("image_url")
+  stockReady           Int      @default(0) @map("stock_ready")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  productionOrders ProductionOrder[]
+  consignmentItems ConsignmentItem[]
+
+  @@map("products")
+}
+
+// ============================================
+// ORDENS DE PRODUÇÃO
+// ============================================
+
+model ProductionOrder {
+  id               Int       @id @default(autoincrement())
+  productId        Int       @map("product_id")
+  filamentRollId   Int       @map("filament_roll_id")
+  machineId        Int       @map("machine_id")
+  status           OrderStatus @default(QUEUED)
+  actualWeightG    Decimal?  @map("actual_weight_g") @db.Decimal(10, 2)
+  actualPrintMinutes Int?    @map("actual_print_minutes")
+  materialCost     Decimal?  @map("material_cost") @db.Decimal(10, 2)
+  energyCost       Decimal?  @map("energy_cost") @db.Decimal(10, 2)
+  totalCost        Decimal?  @map("total_cost") @db.Decimal(10, 2)
+  notes            String?   @db.Text
+  isFailure        Boolean   @default(false) @map("is_failure")
+  startedAt        DateTime? @map("started_at")
+  finishedAt       DateTime? @map("finished_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  product      Product      @relation(fields: [productId], references: [id])
+  filamentRoll FilamentRoll @relation(fields: [filamentRollId], references: [id])
+  machine      Machine      @relation(fields: [machineId], references: [id])
+
+  @@map("production_orders")
+}
+
+enum OrderStatus {
+  QUEUED
+  PRINTING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// DESPESAS FIXAS
+// ============================================
+
+model FixedExpense {
+  id                Int      @id @default(autoincrement())
+  machineId         Int?     @map("machine_id")
+  category          String   // INSTALLMENT, DEPRECIATION, RENT, OTHER
+  description       String
+  amount            Decimal  @db.Decimal(10, 2)
+  dueDate           DateTime @map("due_date") @db.Date
+  isPaid            Boolean  @default(false) @map("is_paid")
+  installmentNumber Int?     @map("installment_number")
+  totalInstallments Int?     @map("total_installments")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  machine Machine? @relation(fields: [machineId], references: [id])
+
+  @@map("fixed_expenses")
+}
+
+// ============================================
+// DESPESAS VARIÁVEIS
+// ============================================
+
+model VariableExpense {
+  id             Int       @id @default(autoincrement())
+  filamentRollId Int?      @map("filament_roll_id")
+  category       String    // FILAMENT, NOZZLE, RESIN, MAINTENANCE, OTHER
+  description    String
+  amount         Decimal   @db.Decimal(10, 2)
+  expenseDate    DateTime  @map("expense_date") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  filamentRoll FilamentRoll? @relation(fields: [filamentRollId], references: [id])
+
+  @@map("variable_expenses")
+}
+
+// ============================================
+// PONTOS DE VENDA E CONSIGNAÇÕES
+// ============================================
+
+model SalesPoint {
+  id            Int      @id @default(autoincrement())
+  name          String
+  type          String   @default("BANCA") // BANCA, LOJA, FEIRA, DIRETO
+  location      String?
+  contactName   String?  @map("contact_name")
+  contactPhone  String?  @map("contact_phone")
+  commissionPct Decimal  @default(15) @map("commission_pct") @db.Decimal(5, 2)
+  notes         String?  @db.Text
+  status        String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  consignments  Consignment[]
+
+  @@map("sales_points")
+}
+
+model Consignment {
+  id             Int       @id @default(autoincrement())
+  salesPointId   Int       @map("sales_point_id")
+  deliveryDate   DateTime  @default(now()) @map("delivery_date") @db.Date
+  settlementDate DateTime? @map("settlement_date") @db.Date
+  status         String    @default("PENDING") // PENDING, SETTLED, PARTIAL
+  notes          String?   @db.Text
+  totalExpected  Decimal   @default(0) @map("total_expected") @db.Decimal(10, 2)
+  totalSettled   Decimal   @default(0) @map("total_settled") @db.Decimal(10, 2)
+  totalCommission Decimal  @default(0) @map("total_commission") @db.Decimal(10, 2)
+  totalProfit    Decimal   @default(0) @map("total_profit") @db.Decimal(10, 2)
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  salesPoint     SalesPoint        @relation(fields: [salesPointId], references: [id])
+  items          ConsignmentItem[]
+
+  @@map("consignments")
+}
+
+model ConsignmentItem {
+  id                Int      @id @default(autoincrement())
+  consignmentId     Int      @map("consignment_id")
+  productId         Int      @map("product_id")
+  quantitySent      Int      @default(0) @map("quantity_sent")
+  quantitySold      Int      @default(0) @map("quantity_sold")
+  quantityReturned  Int      @default(0) @map("quantity_returned")
+  quantityLost      Int      @default(0) @map("quantity_lost")
+  unitPrice         Decimal  @db.Decimal(10, 2) @map("unit_price")
+  costPrice         Decimal  @default(0) @db.Decimal(10, 2) @map("cost_price")
+  totalSoldValue    Decimal  @default(0) @db.Decimal(10, 2) @map("total_sold_value")
+  status            String   @default("CONSIGNED") // CONSIGNED, SETTLED
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  consignment       Consignment @relation(fields: [consignmentId], references: [id], onDelete: Cascade)
+  product           Product     @relation(fields: [productId], references: [id])
+
+  @@map("consignment_items")
+}

@@ -110,7 +110,7 @@ export default function LoginPage() {
         }}>
           <ShieldCheck size={16} style={{ color: 'var(--accent-emerald)', flexShrink: 0, marginTop: 1 }} />
           <div>
-            <strong>Primeiro Acesso?</strong> Se o banco estiver vazio, entre com <code>admin@solyd3d.com</code> e senha <code>Admin@123</code> para criar a contabilidade master.
+            <strong>Primeiro Acesso?</strong> Se o banco estiver vazio, entre com <code>admin@solyd3d.com</code> e senha <code>SenhaAdmin@2026</code> para criar a contabilidade master.
           </div>
         </div>
       </div>

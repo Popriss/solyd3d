@@ -102,7 +102,7 @@ Assim que você abrir o link do seu site ao vivo pela primeira vez, você será 
 
 Como o banco em nuvem está limpo e sem usuários, o sistema possui a engrenagem de inicialização automática. Digite:
 - 📧 **E-mail:** `admin@solyd3d.com`
-- 🔑 **Senha:** `Admin@123`
+- 🔑 **Senha:** `SenhaAdmin@2026`
 
 Ao clicar em **Entrar no Sistema**:
 1. O ERP identifica que é a primeira vez e que o banco está vazio;

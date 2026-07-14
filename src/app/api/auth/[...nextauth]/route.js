@@ -21,10 +21,10 @@ export const authOptions = {
         // Verificar se já existe algum usuário no banco de dados
         const usersCount = await prisma.user.count();
 
-        // SE O BANCO ESTIVER VAZIO e o usuário tentar entrar com admin@solyd3d.com / Admin@123:
+        // SE O BANCO ESTIVER VAZIO e o usuário tentar entrar com admin@solyd3d.com / SenhaAdmin@2026:
         // Criamos o primeiro usuário administrador automaticamente (Opção A)
-        if (usersCount === 0 && email === 'admin@solyd3d.com' && credentials.password === 'Admin@123') {
-          const passwordHash = await bcrypt.hash('Admin@123', 10);
+        if (usersCount === 0 && email === 'admin@solyd3d.com' && credentials.password === 'SenhaAdmin@2026') {
+          const passwordHash = await bcrypt.hash('SenhaAdmin@2026', 10);
           const newAdmin = await prisma.user.create({
             data: {
               name: 'Administrador Solyd3D',
@@ -50,13 +50,28 @@ export const authOptions = {
           throw new Error('Usuário não encontrado ou credenciais inválidas.');
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+        let isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+
+        // Lógica de migração automática: se o usuário admin@solyd3d.com entrar com a nova senha SenhaAdmin@2026
+        // e ainda tinha o hash da senha antiga (Admin@123), atualizamos o hash no banco para SenhaAdmin@2026.
+        if (!isValid && email === 'admin@solyd3d.com' && credentials.password === 'SenhaAdmin@2026') {
+          const isOldPassword = await bcrypt.compare('Admin@123', user.passwordHash);
+          if (isOldPassword) {
+            const newHash = await bcrypt.hash('SenhaAdmin@2026', 10);
+            await prisma.user.update({
+              where: { email: 'admin@solyd3d.com' },
+              data: { passwordHash: newHash },
+            });
+            isValid = true;
+          }
+        }
+
         if (!isValid) {
           throw new Error('Senha incorreta.');
         }
 
-        if (user.role !== 'ADMIN') {
-          throw new Error('Acesso restrito apenas para administradores do sistema.');
+        if (user.role === 'PENDING') {
+          throw new Error('Sua conta ainda está pendente de aprovação por um administrador.');
         }
 
         return {

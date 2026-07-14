@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Package, Boxes, Factory, DollarSign,
-  Settings, Printer, Store, ShoppingBag
+  Settings, Printer, Store, ShoppingBag, Users
 } from 'lucide-react';
 
 const navItems = [
@@ -19,6 +19,7 @@ const navItems = [
   { section: 'Financeiro' },
   { href: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { section: 'Sistema' },
+  { href: '/usuarios', label: 'Usuários & Acessos', icon: Users },
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 

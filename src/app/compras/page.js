@@ -187,10 +187,14 @@ export default function ComprasPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ splitId }),
       });
-      if (res.ok) loadData();
-      else alert('Erro ao quitar rateio.');
+      if (res.ok) {
+        loadData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Erro ao quitar rateio.');
+      }
     } catch (err) {
-      alert('Erro na requisição.');
+      alert('Erro na requisição para quitar rateio.');
     }
   };
 

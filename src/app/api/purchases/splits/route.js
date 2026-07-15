@@ -6,7 +6,7 @@ import { logAction } from '@/lib/activityLogger';
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { splitId, amountPaid } = body;
+    const { splitId, amountPaid, installmentsPaid } = body;
 
     if (!splitId) {
       return NextResponse.json({ error: 'ID do rateio (splitId) é obrigatório' }, { status: 400 });
@@ -22,10 +22,10 @@ export async function PUT(request) {
     }
 
     // Se amountPaid for passado, usamos ele. Se não for, assumimos quitação integral do valor esperado.
-    const newAmountPaid = amountPaid !== undefined ? Number(amountPaid) : Number(split.amountExpected);
+    const newAmountPaid = amountPaid !== undefined && amountPaid !== null ? Number(amountPaid) : Number(split.amountExpected);
     
     // Se installmentsPaid for passado, usamos. Caso contrário, se o novo amountPaid quitou o total, usamos o total de parcelas da compra (ou 1).
-    const newInstallmentsPaid = installmentsPaid !== undefined
+    const newInstallmentsPaid = installmentsPaid !== undefined && installmentsPaid !== null
       ? Number(installmentsPaid)
       : (newAmountPaid >= Number(split.amountExpected) - 0.01 ? (split.purchase?.installmentCount || 1) : Number(split.installmentsPaid || 0));
 
@@ -45,7 +45,7 @@ export async function PUT(request) {
       },
     });
 
-    const descMsg = installmentsPaid !== undefined
+    const descMsg = installmentsPaid !== undefined && installmentsPaid !== null
       ? `Quitou ${newInstallmentsPaid} parcela(s) (Total Pago: R$ ${newAmountPaid.toFixed(2)}) da cota de ${split.partner.name} (Compra #${split.purchaseId}: ${split.purchase.description})`
       : `Quitou R$ ${newAmountPaid.toFixed(2)} da cota de rateio de ${split.partner.name} (Compra #${split.purchaseId}: ${split.purchase.description})`;
 

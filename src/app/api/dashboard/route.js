@@ -55,7 +55,16 @@ export async function GET() {
     });
     const totalVariableExpenses = variableExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
-    const totalMonthlyCost = totalFixedExpenses + totalVariableExpenses + totalProductionCost + totalCommissionPaid;
+    // 4.1 Compras registradas no Caixa de Vendas (BUSINESS_CASH)
+    const businessCashPurchases = await prisma.purchase.findMany({
+      where: {
+        purchaseDate: { gte: startOfMonth, lte: endOfMonth },
+        fundingSource: 'BUSINESS_CASH',
+      },
+    });
+    const totalBusinessCashPurchases = businessCashPurchases.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    const totalMonthlyCost = totalFixedExpenses + totalVariableExpenses + totalProductionCost + totalCommissionPaid + totalBusinessCashPurchases;
     const estimatedNetProfit = totalRevenue - totalMonthlyCost;
 
     // 5. GERAR SÉRIE TEMPORAL PARA O RECHARTS (Evolução Diária - Últimos 14 dias ou dias do mês)
@@ -85,6 +94,14 @@ export async function GET() {
       }
     });
 
+    // Preencher com compras via Caixa de Vendas por data
+    businessCashPurchases.forEach(p => {
+      const dKey = new Date(p.purchaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      if (dailyMap[dKey]) {
+        dailyMap[dKey].cost += Number(p.amount || 0);
+      }
+    });
+
     const dailyRevenue = Object.values(dailyMap);
 
     // 6. TOP PEÇAS VENDIDAS / CONSIGNADAS
@@ -110,6 +127,7 @@ export async function GET() {
       { name: 'Comissões das Bancas', value: totalCommissionPaid, color: '#06b6d4' },
       { name: 'Despesas Fixas', value: totalFixedExpenses, color: '#f59e0b' },
       { name: 'Despesas Variáveis', value: totalVariableExpenses, color: '#ec4899' },
+      { name: 'Compras via Vendas', value: totalBusinessCashPurchases, color: '#10b981' },
     ].filter(item => item.value > 0);
 
     // 8. ATIVIDADES RECENTES (RECONHECEDOR DE AÇÕES)
@@ -135,6 +153,7 @@ export async function GET() {
         failureCost,
         totalFixedExpenses,
         totalVariableExpenses,
+        totalBusinessCashPurchases,
         totalMonthlyCost,
         estimatedNetProfit,
       },

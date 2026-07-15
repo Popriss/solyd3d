@@ -273,9 +273,61 @@ model ActivityLog {
   userName    String   @map("user_name")
   userEmail   String   @map("user_email")
   actionType  String   @map("action_type") // CRIAR, ATUALIZAR, EXCLUIR, CONCLUIR
-  module      String   // ESTOQUE, PRODUTOS, PRODUCAO, MAQUINAS, VENDAS, FINANCEIRO, USUARIOS
+  module      String   // ESTOQUE, PRODUTOS, PRODUCAO, MAQUINAS, VENDAS, FINANCEIRO, USUARIOS, COMPRAS
   description String   @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("activity_logs")
+}
+
+// ============================================
+// COMPRAS, DESPESAS E RATEIO ENTRE SÓCIOS
+// ============================================
+
+model Partner {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String?
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  splits           PurchaseSplit[]
+  purchasesPaidBy  Purchase[]
+
+  @@map("partners")
+}
+
+model Purchase {
+  id              Int      @id @default(autoincrement())
+  description     String
+  amount          Decimal  @db.Decimal(10, 2)
+  paymentMethod   String   @map("payment_method") // CREDIT_CARD, DEBIT_CARD, PIX
+  fundingSource   String   @map("funding_source") // BUSINESS_CASH (Caixa de Vendas), PARTNER_CONTRIBUTION (Aporte Sócios)
+  paidByPartnerId Int?     @map("paid_by_partner_id") // Sócio que adiantou/pagou a conta
+  purchaseDate    DateTime @default(now()) @map("purchase_date") @db.Date
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  paidByPartner   Partner?        @relation(fields: [paidByPartnerId], references: [id])
+  splits          PurchaseSplit[]
+
+  @@map("purchases")
+}
+
+model PurchaseSplit {
+  id             Int      @id @default(autoincrement())
+  purchaseId     Int      @map("purchase_id")
+  partnerId      Int      @map("partner_id")
+  amountExpected Decimal  @map("amount_expected") @db.Decimal(10, 2)
+  amountPaid     Decimal  @default(0) @map("amount_paid") @db.Decimal(10, 2)
+  status         String   @default("PENDING") // PENDING (Devendo aporte), SETTLED (Aportado/Quitado)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  partner  Partner  @relation(fields: [partnerId], references: [id])
+
+  @@map("purchase_splits")
 }

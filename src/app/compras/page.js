@@ -39,6 +39,11 @@ export default function ComprasPage() {
   const [payInstallmentCountInput, setPayInstallmentCountInput] = useState('1');
   const [payInstallmentValueInput, setPayInstallmentValueInput] = useState('');
 
+  // Filtros - Contas a Receber / Pagar do Rateio
+  const [filterPartnerId, setFilterPartnerId] = useState('');
+  const [filterSplitStatus, setFilterSplitStatus] = useState('');
+  const [filterSplitSearch, setFilterSplitSearch] = useState('');
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -583,125 +588,238 @@ export default function ComprasPage() {
           {/* Tabela de Contas a Receber / Pagar do Rateio (PurchaseSplits) */}
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <CreditCard size={18} style={{ color: 'var(--accent-indigo)' }} />
-                Contas a Receber / Pagar (Detalhamento do Rateio de Aportes)
-              </h3>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                Todas as compras financiadas por Aporte de Sócios e como a conta foi dividida. Clique em &quot;Quitar&quot; quando o sócio transferir a cota.
-              </p>
-            </div>
-            <div className="card-body">
-              {purchases.filter((p) => p.fundingSource === 'PARTNER_CONTRIBUTION').length === 0 ? (
-                <div className="empty-state" style={{ padding: 30 }}>
-                  <Users size={36} />
-                  <div className="empty-state-title">Nenhum rateio entre sócios gerado ainda</div>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                    Ao registrar uma nova compra com origem &quot;Aporte de Sócios&quot;, o sistema gerará automaticamente as cotas individuais aqui.
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CreditCard size={18} style={{ color: 'var(--accent-indigo)' }} />
+                    Contas a Receber / Pagar (Detalhamento do Rateio de Aportes)
+                  </h3>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                    Todas as compras financiadas por Aporte de Sócios e como a conta foi dividida. Clique em &quot;Quitar&quot; quando o sócio transferir a cota.
                   </p>
                 </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Compra Original</th>
-                        <th>Sócio Rateado</th>
-                        <th>Cota Esperada</th>
-                        <th>Aportado / Quitado</th>
-                        <th>Status do Depósito</th>
-                        <th style={{ textAlign: 'right' }}>Ação de Quitação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {purchases
-                        .filter((p) => p.fundingSource === 'PARTNER_CONTRIBUTION')
-                        .flatMap((p) =>
-                          (p.splits || []).map((split) => {
-                            const isPending = split.status === 'PENDING';
-                            return (
-                              <tr key={split.id}>
-                                <td>
-                                  <strong style={{ display: 'block', color: 'var(--text-primary)' }}>
-                                    {p.description}
-                                  </strong>
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    Total: {formatCurrency(p.amount)} • {formatDate(p.purchaseDate)}
+
+                {(filterPartnerId || filterSplitStatus || filterSplitSearch) && (
+                  <button
+                    onClick={() => {
+                      setFilterPartnerId('');
+                      setFilterSplitStatus('');
+                      setFilterSplitSearch('');
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    Limpar Filtros
+                  </button>
+                )}
+              </div>
+
+              {/* BARRA DE FILTROS DO RATEIO */}
+              <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: 14, marginTop: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'end' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem', margin: '0 0 6px' }}>Filtrar por Sócio Rateado</label>
+                  <select
+                    className="form-input"
+                    style={{ padding: '8px 10px', fontSize: '0.85rem' }}
+                    value={filterPartnerId}
+                    onChange={(e) => setFilterPartnerId(e.target.value)}
+                  >
+                    <option value="">Todos os Sócios</option>
+                    {partners.map((pt) => (
+                      <option key={pt.id} value={pt.id}>
+                        {pt.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem', margin: '0 0 6px' }}>Status do Depósito</label>
+                  <select
+                    className="form-input"
+                    style={{ padding: '8px 10px', fontSize: '0.85rem' }}
+                    value={filterSplitStatus}
+                    onChange={(e) => setFilterSplitStatus(e.target.value)}
+                  >
+                    <option value="">Todos os Status</option>
+                    <option value="PENDING">🔴 Devendo Aporte (Pendente)</option>
+                    <option value="SETTLED">🟢 Quitado / Aportado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem', margin: '0 0 6px' }}>Buscar Compra / Descrição</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{ padding: '8px 10px', fontSize: '0.85rem' }}
+                    placeholder="Ex: Sacos à vácuo, Retífica..."
+                    value={filterSplitSearch}
+                    onChange={(e) => setFilterSplitSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="card-body">
+              {(() => {
+                const allSplits = purchases
+                  .filter((p) => p.fundingSource === 'PARTNER_CONTRIBUTION')
+                  .flatMap((p) =>
+                    (p.splits || []).map((split) => ({ ...split, purchase: p }))
+                  );
+
+                if (allSplits.length === 0) {
+                  return (
+                    <div className="empty-state" style={{ padding: 30 }}>
+                      <Users size={36} />
+                      <div className="empty-state-title">Nenhum rateio entre sócios gerado ainda</div>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        Ao registrar uma nova compra com origem &quot;Aporte de Sócios&quot;, o sistema gerará automaticamente as cotas individuais aqui.
+                      </p>
+                    </div>
+                  );
+                }
+
+                const filteredSplits = allSplits.filter((item) => {
+                  if (filterPartnerId && String(item.partnerId) !== String(filterPartnerId)) {
+                    return false;
+                  }
+                  if (filterSplitStatus && item.status !== filterSplitStatus) {
+                    return false;
+                  }
+                  if (filterSplitSearch && filterSplitSearch.trim() !== '') {
+                    const q = filterSplitSearch.toLowerCase();
+                    const descMatch = (item.purchase?.description || '').toLowerCase().includes(q);
+                    const partnerMatch = (item.partner?.name || '').toLowerCase().includes(q);
+                    if (!descMatch && !partnerMatch) return false;
+                  }
+                  return true;
+                });
+
+                if (filteredSplits.length === 0) {
+                  return (
+                    <div className="empty-state" style={{ padding: 30 }}>
+                      <AlertCircle size={32} style={{ color: 'var(--text-muted)' }} />
+                      <div className="empty-state-title" style={{ fontSize: '1rem', marginTop: 10 }}>Nenhum rateio encontrado com estes filtros</div>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                        Tente limpar a busca ou selecionar outro sócio/status.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setFilterPartnerId('');
+                          setFilterSplitStatus('');
+                          setFilterSplitSearch('');
+                        }}
+                        className="btn btn-secondary"
+                        style={{ marginTop: 12, padding: '6px 14px', fontSize: '0.8rem' }}
+                      >
+                        Limpar Filtros
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="table-responsive">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Compra Original</th>
+                          <th>Sócio Rateado</th>
+                          <th>Cota Esperada</th>
+                          <th>Aportado / Quitado</th>
+                          <th>Status do Depósito</th>
+                          <th style={{ textAlign: 'right' }}>Ação de Quitação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredSplits.map((split) => {
+                          const p = split.purchase;
+                          const isPending = split.status === 'PENDING';
+                          return (
+                            <tr key={split.id}>
+                              <td>
+                                <strong style={{ display: 'block', color: 'var(--text-primary)' }}>
+                                  {p.description}
+                                </strong>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  Total: {formatCurrency(p.amount)} • {formatDate(p.purchaseDate)}
+                                </span>
+                              </td>
+                              <td>
+                                <strong style={{ fontSize: '0.9rem', color: 'var(--accent-indigo)' }}>
+                                  {split.partner?.name || 'Sócio'}
+                                </strong>
+                              </td>
+                              <td>
+                                <strong style={{ color: 'var(--text-primary)' }}>
+                                  {formatCurrency(split.amountExpected)}
+                                </strong>
+                              </td>
+                              <td>
+                                <span style={{ color: isPending ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 600, display: 'block' }}>
+                                  {formatCurrency(split.amountPaid)}
+                                </span>
+                                {p.paymentMethod === 'CREDIT_CARD' && p.installmentCount && Number(p.installmentCount) > 1 && (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--accent-indigo)', fontWeight: 600 }}>
+                                    ({split.installmentsPaid || 0}/{p.installmentCount} parcelas quitadas)
                                   </span>
-                                </td>
-                                <td>
-                                  <strong style={{ fontSize: '0.9rem', color: 'var(--accent-indigo)' }}>
-                                    {split.partner?.name || 'Sócio'}
-                                  </strong>
-                                </td>
-                                <td>
-                                  <strong style={{ color: 'var(--text-primary)' }}>
-                                    {formatCurrency(split.amountExpected)}
-                                  </strong>
-                                </td>
-                                <td>
-                                  <span style={{ color: isPending ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 600, display: 'block' }}>
-                                    {formatCurrency(split.amountPaid)}
+                                )}
+                              </td>
+                              <td>
+                                {isPending && split.installmentsPaid && Number(split.installmentsPaid) > 0 ? (
+                                  <span className="badge badge-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <CreditCard size={13} /> {split.installmentsPaid}/{p.installmentCount} Parcelas
                                   </span>
-                                  {p.paymentMethod === 'CREDIT_CARD' && p.installmentCount && Number(p.installmentCount) > 1 && (
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-indigo)', fontWeight: 600 }}>
-                                      ({split.installmentsPaid || 0}/{p.installmentCount} parcelas quitadas)
-                                    </span>
-                                  )}
-                                </td>
-                                <td>
-                                  {isPending && split.installmentsPaid && Number(split.installmentsPaid) > 0 ? (
-                                    <span className="badge badge-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                      <CreditCard size={13} /> {split.installmentsPaid}/{p.installmentCount} Parcelas
-                                    </span>
-                                  ) : isPending ? (
-                                    <span className="badge badge-rose" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                      <AlertCircle size={13} /> Devendo Aporte
-                                    </span>
-                                  ) : (
-                                    <span className="badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                      <CheckCircle2 size={13} /> Quitado / Aportado
-                                    </span>
-                                  )}
-                                </td>
-                                <td style={{ textAlign: 'right' }}>
-                                  {isPending && p.paymentMethod === 'CREDIT_CARD' && p.installmentCount && Number(p.installmentCount) > 1 ? (
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
-                                      <button
-                                        onClick={() => handleOpenInstallmentModal(split, p)}
-                                        className="btn btn-primary"
-                                        style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                        title="Quitar Parcela(s) Específica(s)"
-                                      >
-                                        <CreditCard size={14} /> Quitar Parcelas
-                                      </button>
-                                      <button
-                                        onClick={() => handleSettleSplit(split.id)}
-                                        className="btn btn-secondary"
-                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                        title="Quitar Saldo Total de uma vez"
-                                      >
-                                        <CheckCircle2 size={14} /> Total
-                                      </button>
-                                    </div>
-                                  ) : isPending ? (
+                                ) : isPending ? (
+                                  <span className="badge badge-rose" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <AlertCircle size={13} /> Devendo Aporte
+                                  </span>
+                                ) : (
+                                  <span className="badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <CheckCircle2 size={13} /> Quitado / Aportado
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                {isPending && p.paymentMethod === 'CREDIT_CARD' && p.installmentCount && Number(p.installmentCount) > 1 ? (
+                                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
+                                    <button
+                                      onClick={() => handleOpenInstallmentModal(split, p)}
+                                      className="btn btn-primary"
+                                      style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                      title="Quitar Parcela(s) Específica(s)"
+                                    >
+                                      <CreditCard size={14} /> Quitar Parcelas
+                                    </button>
                                     <button
                                       onClick={() => handleSettleSplit(split.id)}
-                                      className="btn btn-primary"
-                                      style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                      className="btn btn-secondary"
+                                      style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                      title="Quitar Saldo Total de uma vez"
                                     >
-                                      <CheckCircle2 size={14} /> Registrar Depósito / Quitar
+                                      <CheckCircle2 size={14} /> Total
                                     </button>
-                                  ) : null}
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                                  </div>
+                                ) : isPending ? (
+                                  <button
+                                    onClick={() => handleSettleSplit(split.id)}
+                                    className="btn btn-primary"
+                                    style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                  >
+                                    <CheckCircle2 size={14} /> Registrar Depósito / Quitar
+                                  </button>
+                                ) : null}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   ShoppingCart, DollarSign, Users, Plus, Trash2, CheckCircle2,
   AlertCircle, CreditCard, Wallet, ArrowUpRight, ArrowDownRight,
-  UserCheck, ShieldCheck, Filter, RefreshCw
+  UserCheck, ShieldCheck, Filter, RefreshCw, TrendingUp
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 
@@ -44,12 +44,16 @@ export default function ComprasPage() {
   const [filterSplitStatus, setFilterSplitStatus] = useState('');
   const [filterSplitSearch, setFilterSplitSearch] = useState('');
 
+  // Estado de Compensação / Netting de Dívidas
+  const [nettingData, setNettingData] = useState(null);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [resPurchases, resPartners] = await Promise.all([
+      const [resPurchases, resPartners, resNetting] = await Promise.all([
         fetch('/api/purchases').then((r) => r.json()),
         fetch('/api/partners').then((r) => r.json()),
+        fetch('/api/purchases/netting').then((r) => r.json()),
       ]);
       if (!resPurchases.error) setPurchases(resPurchases);
       if (!resPartners.error) {
@@ -57,6 +61,7 @@ export default function ComprasPage() {
         // Por padrão ao criar compra com Aporte, selecionamos todos os sócios ativos
         setSelectedPartners(resPartners.filter((p) => p.active).map((p) => p.id));
       }
+      if (!resNetting.error) setNettingData(resNetting);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     } finally {
@@ -386,6 +391,24 @@ export default function ComprasPage() {
           }}
         >
           <Users size={18} /> Sócios & Contas Internas de Rateio ({partners.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('netting')}
+          style={{
+            background: activeTab === 'netting' ? 'var(--accent-indigo)' : 'var(--bg-secondary)',
+            color: activeTab === 'netting' ? '#fff' : 'var(--text-secondary)',
+            border: '1px solid var(--border-primary)',
+            padding: '10px 20px',
+            borderRadius: 8,
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            transition: 'all 0.2s',
+          }}
+        >
+          <TrendingUp size={18} /> ⚖️ Compensação & Saldos Cruzados (Netting)
         </button>
       </div>
 
@@ -872,6 +895,278 @@ export default function ComprasPage() {
                   </div>
                 );
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONTEÚDO DA ABA 3: COMPENSAÇÃO DE DÍVIDAS & SALDOS CRUZADOS (NETTING) */}
+      {activeTab === 'netting' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Header & Métricas do Netting */}
+          <div className="card">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <TrendingUp size={20} style={{ color: 'var(--accent-indigo)' }} />
+                  Compensação Automática de Dívidas (Debt Netting)
+                </h3>
+                <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                  O sistema cruza débitos mútuos entre os sócios e a conta da empresa para anular transferências redundantes e exibir apenas o saldo líquido final.
+                </p>
+              </div>
+              <button
+                onClick={loadData}
+                className="btn btn-secondary"
+                style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <RefreshCw size={15} /> Recalcular Compensação
+              </button>
+            </div>
+
+            <div className="card-body">
+              {loading || !nettingData ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>
+                  <div className="spinner" style={{ width: 32, height: 32, margin: '0 auto' }}></div>
+                  <p style={{ marginTop: 12, color: 'var(--text-muted)' }}>Cruzando transações bilaterais e calculando saldo líquido...</p>
+                </div>
+              ) : (
+                <div>
+                  {/* Resumo em 3 Cartões de KPI */}
+                  <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginBottom: 28 }}>
+                    <div className="stat-card" style={{ borderLeft: '4px solid var(--text-muted)' }}>
+                      <div className="stat-card-label">Dívida Bruta Acumulada</div>
+                      <div className="stat-card-value" style={{ color: 'var(--text-primary)' }}>
+                        {formatCurrency(nettingData?.metrics?.totalGrossDebt || 0)}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                        Soma de todas as parcelas pendentes sem cruzamento
+                      </div>
+                    </div>
+
+                    <div className="stat-card emerald" style={{ borderLeft: '4px solid var(--accent-emerald)' }}>
+                      <div className="stat-card-label">Dívida Líquida Pós-Compensação</div>
+                      <div className="stat-card-value" style={{ color: 'var(--accent-emerald)' }}>
+                        {formatCurrency(nettingData?.metrics?.totalNetDebt || 0)}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                        Valor real que precisa ser movimentado/depositado
+                      </div>
+                    </div>
+
+                    <div className="stat-card indigo" style={{ borderLeft: '4px solid var(--accent-indigo)' }}>
+                      <div className="stat-card-label">Economia no Fluxo de Transferências</div>
+                      <div className="stat-card-value" style={{ color: 'var(--accent-indigo)' }}>
+                        {formatCurrency(nettingData?.metrics?.totalSavedByNetting || 0)}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                        Dívidas mútuas anuladas automaticamente
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PAINEL DE SITUAÇÃO INDIVIDUAL: QUEM DEVE / QUEM TEM A RECEBER */}
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Users size={18} style={{ color: 'var(--accent-indigo)' }} />
+                    Painel de Saldos por Participante
+                  </h4>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                      gap: 16,
+                      marginBottom: 32,
+                    }}
+                  >
+                    {nettingData?.participantsSummary?.map((p) => {
+                      const isCreditor = p.netBalance > 0;
+                      const isDebtor = p.netBalance < 0;
+                      const isZero = p.netBalance === 0;
+
+                      return (
+                        <div
+                          key={p.id}
+                          style={{
+                            background: p.isCompany ? 'rgba(129, 140, 248, 0.06)' : 'var(--bg-secondary)',
+                            border: p.isCompany ? '2px solid rgba(129, 140, 248, 0.4)' : '1px solid var(--border-primary)',
+                            borderRadius: 12,
+                            padding: 18,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                              <div>
+                                <h5 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  {p.isCompany ? '🏢' : '👤'} {p.name}
+                                </h5>
+                                <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                                  {p.isCompany ? 'Caixa Jurídico / Conta da Empresa' : 'Sócio Cotista'}
+                                </span>
+                              </div>
+
+                              {isCreditor && (
+                                <span className="badge badge-emerald" style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: 700 }}>
+                                  + {formatCurrency(p.netBalance)} a Receber
+                                </span>
+                              )}
+                              {isDebtor && (
+                                <span className="badge badge-rose" style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: 700 }}>
+                                  {formatCurrency(Math.abs(p.netBalance))} a Pagar
+                                </span>
+                              )}
+                              {isZero && (
+                                <span className="badge badge-secondary" style={{ padding: '6px 10px', fontSize: '0.78rem' }}>
+                                  ✔ Quitado
+                                </span>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 12, borderTop: '1px solid var(--border-primary)', borderBottom: '1px solid var(--border-primary)', padding: '10px 0', marginBottom: 12 }}>
+                              <div style={{ flex: 1 }}>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Total a Receber:</span>
+                                <strong style={{ fontSize: '0.88rem', color: p.totalToReceive > 0 ? 'var(--accent-emerald)' : 'var(--text-secondary)' }}>
+                                  {formatCurrency(p.totalToReceive)}
+                                </strong>
+                              </div>
+                              <div style={{ flex: 1, borderLeft: '1px solid var(--border-primary)', paddingLeft: 12 }}>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Total a Pagar:</span>
+                                <strong style={{ fontSize: '0.88rem', color: p.totalToPay > 0 ? 'var(--accent-rose)' : 'var(--text-secondary)' }}>
+                                  {formatCurrency(p.totalToPay)}
+                                </strong>
+                              </div>
+                            </div>
+
+                            {/* Detalhamento de Para Quem Pagar ou De Quem Receber */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {p.debtsDetails?.length > 0 && (
+                                <div>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-rose)', display: 'block', marginBottom: 4 }}>
+                                    🎯 Precisa Enviar o Valor Para:
+                                  </span>
+                                  {p.debtsDetails.map((item, idx) => (
+                                    <div key={idx} style={{ background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.2)', borderRadius: 6, padding: '6px 10px', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                      <span>Enviar para <strong>{item.targetName}</strong></span>
+                                      <span style={{ fontWeight: 700, color: 'var(--accent-rose)' }}>{formatCurrency(item.amount)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {p.receivablesDetails?.length > 0 && (
+                                <div>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-emerald)', display: 'block', marginBottom: 4 }}>
+                                    📥 Vai Receber De:
+                                  </span>
+                                  {p.receivablesDetails.map((item, idx) => (
+                                    <div key={idx} style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 6, padding: '6px 10px', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                      <span>Receber de <strong>{item.sourceName}</strong></span>
+                                      <span style={{ fontWeight: 700, color: 'var(--accent-emerald)' }}>{formatCurrency(item.amount)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {p.debtsDetails?.length === 0 && p.receivablesDetails?.length === 0 && (
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'block', padding: '6px 0' }}>
+                                  Nenhuma pendência ou crédito compensado.
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* MATRIZ DE COMPENSAÇÃO FINAL ("QUEM DEVE PARA QUEM") */}
+                  <div style={{ borderTop: '1px solid var(--border-primary)', paddingTop: 24 }}>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CheckCircle2 size={18} style={{ color: 'var(--accent-emerald)' }} />
+                      Matriz Simplificada de Compensação Direta ("Quem Deve Para Quem")
+                    </h4>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 16 }}>
+                      Abaixo estão as únicas transferências reais necessárias após o cruzamento e abate automático das dívidas bilaterais:
+                    </p>
+
+                    {nettingData?.netDebts?.length === 0 ? (
+                      <div className="empty-state" style={{ padding: 40, background: 'var(--bg-secondary)', borderRadius: 12 }}>
+                        <CheckCircle2 size={44} style={{ color: 'var(--accent-emerald)', marginBottom: 12 }} />
+                        <div className="empty-state-title" style={{ color: 'var(--text-primary)' }}>Todas as contas estão zeradas e liquidadas!</div>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', maxWidth: 450, margin: '0 auto' }}>
+                          Não há saldos pendentes ou compensações a serem realizadas entre os sócios e a conta da empresa no momento.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="table-responsive">
+                        <table className="data-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 4px' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ padding: '12px 16px', background: 'var(--bg-secondary)', borderRadius: '8px 0 0 8px' }}>👤 Sócio Devedor (Origem)</th>
+                              <th style={{ padding: '12px 16px', background: 'var(--bg-secondary)', textAlign: 'center' }}>➡️ Fluxo</th>
+                              <th style={{ padding: '12px 16px', background: 'var(--bg-secondary)' }}>🏢 / 👤 Credor Destinatário (Quem Recebe)</th>
+                              <th style={{ padding: '12px 16px', background: 'var(--bg-secondary)' }}>Valor Bruto Original</th>
+                              <th style={{ padding: '12px 16px', background: 'var(--bg-secondary)' }}>Economia com Cruzamento</th>
+                              <th style={{ padding: '12px 16px', background: 'var(--bg-secondary)', textAlign: 'right', borderRadius: '0 8px 8px 0' }}>Valor Líquido a Transferir</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {nettingData.netDebts.map((item, idx) => {
+                              const isToCompany = item.creditorId === 'COMPANY';
+                              return (
+                                <tr key={idx} style={{ background: 'var(--bg-card)' }}>
+                                  <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.25)', padding: '5px 12px', borderRadius: 8 }}>
+                                      <Users size={14} style={{ color: 'var(--accent-rose)' }} />
+                                      <strong style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>{item.debtorName}</strong>
+                                    </div>
+                                  </td>
+
+                                  <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', textAlign: 'center' }}>
+                                    <span style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>➡️</span>
+                                  </td>
+
+                                  <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: isToCompany ? 'rgba(16, 185, 129, 0.1)' : 'rgba(129, 140, 248, 0.1)', border: isToCompany ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(129, 140, 248, 0.25)', padding: '5px 12px', borderRadius: 8 }}>
+                                      {isToCompany ? <Wallet size={14} style={{ color: 'var(--accent-emerald)' }} /> : <Users size={14} style={{ color: 'var(--accent-indigo)' }} />}
+                                      <strong style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>{item.creditorName}</strong>
+                                    </div>
+                                  </td>
+
+                                  <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                                      {formatCurrency(item.grossOriginal)}
+                                    </span>
+                                  </td>
+
+                                  <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
+                                    {item.nettedSavings > 0 ? (
+                                      <span className="badge badge-indigo" style={{ padding: '4px 8px', fontSize: '0.74rem' }}>
+                                        ⚡ Abateu {formatCurrency(item.nettedSavings)}
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sem dívida reversa</span>
+                                    )}
+                                  </td>
+
+                                  <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', textAlign: 'right' }}>
+                                    <strong style={{ color: 'var(--accent-emerald)', fontSize: '1.05rem', background: 'rgba(16, 185, 129, 0.08)', padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                                      {formatCurrency(item.netAmount)}
+                                    </strong>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -722,16 +722,16 @@ export default function ComprasPage() {
 
                 return (
                   <div className="table-responsive">
-                    <table className="data-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 4px' }}>
+                    <table className="data-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 4px', tableLayout: 'auto' }}>
                       <thead>
                         <tr>
-                          <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: '8px 0 0 8px' }}>Compra Original</th>
-                          <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)' }}>Sócio Rateado</th>
-                          <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)' }}>Cota Esperada</th>
-                          <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)' }}>Para Quem Enviar o Valor?</th>
-                          <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)' }}>Aportado & Progresso</th>
-                          <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)' }}>Status do Depósito</th>
-                          <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)', textAlign: 'right', borderRadius: '0 8px 8px 0' }}>Ações de Quitação</th>
+                          <th style={{ padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: '8px 0 0 8px' }}>Compra Original</th>
+                          <th style={{ padding: '12px 14px', background: 'var(--bg-secondary)' }}>Sócio Rateado</th>
+                          <th style={{ padding: '12px 14px', background: 'var(--bg-secondary)' }}>Cota Esperada</th>
+                          <th style={{ padding: '12px 14px', background: 'var(--bg-secondary)' }}>Para Quem Enviar?</th>
+                          <th style={{ padding: '12px 14px', background: 'var(--bg-secondary)' }}>Aportado & Progresso</th>
+                          <th style={{ padding: '12px 14px', background: 'var(--bg-secondary)' }}>Status do Depósito</th>
+                          <th style={{ padding: '12px 14px', background: 'var(--bg-secondary)', textAlign: 'right', borderRadius: '0 8px 8px 0' }}>Ação</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -742,114 +742,120 @@ export default function ComprasPage() {
 
                           return (
                             <tr key={split.id} style={{ background: 'var(--bg-card)', transition: 'all 0.2s ease' }}>
-                              <td style={{ padding: '16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
-                                <strong style={{ display: 'block', color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: 3 }}>
+                              {/* COMPRA ORIGINAL */}
+                              <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', minWidth: '150px', maxWidth: '230px', whiteSpace: 'normal' }}>
+                                <strong style={{ display: 'block', color: 'var(--text-primary)', fontSize: '0.88rem', lineHeight: '1.3', marginBottom: 2 }}>
                                   {p.description}
                                 </strong>
-                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <DollarSign size={13} style={{ color: 'var(--accent-indigo)' }} /> Total: {formatCurrency(p.amount)} • {formatDate(p.purchaseDate)}
+                                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>
+                                  R$ {Number(p.amount).toFixed(2)} • {formatDate(p.purchaseDate)}
                                 </span>
                               </td>
 
-                              <td style={{ padding: '16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(129, 140, 248, 0.1)', border: '1px solid rgba(129, 140, 248, 0.25)', padding: '6px 12px', borderRadius: 8 }}>
-                                  <Users size={15} style={{ color: 'var(--accent-indigo)' }} />
-                                  <strong style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                              {/* SÓCIO RATEADO */}
+                              <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(129, 140, 248, 0.1)', border: '1px solid rgba(129, 140, 248, 0.25)', padding: '4px 10px', borderRadius: 6 }}>
+                                  <Users size={14} style={{ color: 'var(--accent-indigo)' }} />
+                                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                                     {split.partner?.name || 'Sócio'}
                                   </strong>
                                 </div>
                               </td>
 
-                              <td style={{ padding: '16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
-                                <strong style={{ color: 'var(--text-primary)', fontSize: '1.02rem', display: 'block' }}>
+                              {/* COTA ESPERADA */}
+                              <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>
                                   {formatCurrency(split.amountExpected)}
                                 </strong>
                               </td>
 
-                              {/* NOVA COLUNA: PARA QUEM ENVIAR O VALOR? */}
-                              <td style={{ padding: '16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
+                              {/* PARA QUEM ENVIAR O VALOR? */}
+                              <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', minWidth: '150px', maxWidth: '200px', whiteSpace: 'normal' }}>
                                 {isSelfPaid ? (
-                                  <span className="badge badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px' }}>
+                                  <span className="badge badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: '0.72rem' }}>
                                     ✨ Antecipou (Credor)
                                   </span>
                                 ) : p.paidByPartnerId ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                    <span className="badge badge-indigo" style={{ display: 'inline-flex', width: 'fit-content', alignItems: 'center', gap: 5, fontSize: '0.78rem', padding: '6px 12px' }}>
+                                  <div>
+                                    <span className="badge badge-indigo" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.74rem', padding: '4px 8px' }}>
                                       👤 Enviar para: {p.paidByPartner?.name}
                                     </span>
-                                    <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>
-                                      Sócio adiantou/pagou na compra original
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginTop: 2, lineHeight: '1.2' }}>
+                                      Sócio adiantou a compra
                                     </span>
                                   </div>
                                 ) : (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                    <span className="badge badge-emerald" style={{ display: 'inline-flex', width: 'fit-content', alignItems: 'center', gap: 5, fontSize: '0.78rem', padding: '6px 12px' }}>
+                                  <div>
+                                    <span className="badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.74rem', padding: '4px 8px' }}>
                                       🏢 Conta da Empresa
                                     </span>
-                                    <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>
-                                      Repor caixa operacional ou cartão da empresa
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginTop: 2, lineHeight: '1.2' }}>
+                                      Repor caixa da empresa
                                     </span>
                                   </div>
                                 )}
                               </td>
 
-                              <td style={{ padding: '16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
-                                <span style={{ color: isPending ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 700, fontSize: '0.95rem', display: 'block' }}>
+                              {/* APORTADO & PROGRESSO */}
+                              <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                <span style={{ color: isPending ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 700, fontSize: '0.9rem', display: 'block' }}>
                                   {formatCurrency(split.amountPaid)}
                                 </span>
                                 {p.paymentMethod === 'CREDIT_CARD' && p.installmentCount && Number(p.installmentCount) > 1 && (
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--accent-indigo)', fontWeight: 600, display: 'block', marginTop: 2 }}>
-                                    ({split.installmentsPaid || 0}/{p.installmentCount} parcelas quitadas)
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--accent-indigo)', fontWeight: 600, display: 'block', marginTop: 1 }}>
+                                    ({split.installmentsPaid || 0}/{p.installmentCount} parc.)
                                   </span>
                                 )}
                               </td>
 
-                              <td style={{ padding: '16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle' }}>
+                              {/* STATUS DO DEPÓSITO */}
+                              <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                                 {isPending && split.installmentsPaid && Number(split.installmentsPaid) > 0 ? (
-                                  <span className="badge badge-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px' }}>
-                                    <CreditCard size={13} /> {split.installmentsPaid}/{p.installmentCount} Parcelas
+                                  <span className="badge badge-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: '0.72rem' }}>
+                                    <CreditCard size={12} /> {split.installmentsPaid}/{p.installmentCount} Parc.
                                   </span>
                                 ) : isPending ? (
-                                  <span className="badge badge-rose" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px' }}>
-                                    <AlertCircle size={13} /> Devendo Aporte
+                                  <span className="badge badge-rose" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: '0.72rem' }}>
+                                    <AlertCircle size={12} /> Devendo
                                   </span>
                                 ) : (
-                                  <span className="badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px' }}>
-                                    <CheckCircle2 size={13} /> Quitado / Aportado
+                                  <span className="badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: '0.72rem' }}>
+                                    <CheckCircle2 size={12} /> Quitado
                                   </span>
                                 )}
                               </td>
 
-                              <td style={{ padding: '16px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', textAlign: 'right' }}>
+                              {/* AÇÃO DE QUITAÇÃO */}
+                              <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', verticalAlign: 'middle', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                 {isPending && p.paymentMethod === 'CREDIT_CARD' && p.installmentCount && Number(p.installmentCount) > 1 ? (
-                                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                                     <button
                                       onClick={() => handleOpenInstallmentModal(split, p)}
                                       className="btn btn-primary"
-                                      style={{ padding: '8px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                                      style={{ padding: '6px 10px', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                                       title="Quitar Parcela(s) Específica(s)"
                                     >
-                                      <CreditCard size={15} /> Quitar Parcelas
+                                      <CreditCard size={14} /> Parcelas
                                     </button>
                                     <button
                                       onClick={() => handleSettleSplit(split.id)}
                                       className="btn btn-secondary"
-                                      style={{ padding: '8px 12px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                                      style={{ padding: '6px 10px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                                       title="Quitar Saldo Total de uma vez"
                                     >
-                                      <CheckCircle2 size={15} /> Total
+                                      <CheckCircle2 size={14} /> Total
                                     </button>
                                   </div>
                                 ) : isPending ? (
                                   <button
                                     onClick={() => handleSettleSplit(split.id)}
                                     className="btn btn-primary"
-                                    style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                                    style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}
                                   >
-                                    <CheckCircle2 size={15} /> Registrar Depósito / Quitar
+                                    <CheckCircle2 size={14} /> Quitar / Depositar
                                   </button>
                                 ) : (
-                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500 }}>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 500 }}>
                                     ✔ Acertado
                                   </span>
                                 )}

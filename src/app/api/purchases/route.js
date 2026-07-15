@@ -35,6 +35,9 @@ export async function POST(request) {
       fundingSource,
       paidByPartnerId,
       partnerIds,
+      installmentCount,
+      installmentValue,
+      businessCashAmount,
       purchaseDate,
       notes,
     } = body;
@@ -54,6 +57,18 @@ export async function POST(request) {
     const totalAmount = Number(amount);
     const dateToSave = purchaseDate ? new Date(purchaseDate) : new Date();
 
+    const isCreditCard = paymentMethod === 'CREDIT_CARD';
+    const instCount = isCreditCard && installmentCount ? Number(installmentCount) : null;
+    const instVal = isCreditCard && installmentValue ? Number(installmentValue) : (instCount ? Number((totalAmount / instCount).toFixed(2)) : null);
+
+    // Definir quanto sai/deduz diretamente do Caixa de Vendas da empresa
+    let bizCash = 0;
+    if (fundingSource === 'BUSINESS_CASH') {
+      bizCash = totalAmount;
+    } else if (fundingSource === 'PARTNER_CONTRIBUTION') {
+      bizCash = businessCashAmount ? Math.min(totalAmount, Number(businessCashAmount)) : 0;
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Criar o registro de compra
       const purchase = await tx.purchase.create({
@@ -63,14 +78,18 @@ export async function POST(request) {
           paymentMethod: paymentMethod || 'PIX', // CREDIT_CARD, DEBIT_CARD, PIX
           fundingSource,
           paidByPartnerId: paidByPartnerId ? Number(paidByPartnerId) : null,
+          installmentCount: instCount,
+          installmentValue: instVal,
+          businessCashAmount: bizCash,
           purchaseDate: dateToSave,
           notes: notes ? notes.trim() : null,
         },
       });
 
-      // 2. Se for Aporte de Sócios, criar a divisão (rateio) em PurchaseSplit
+      // 2. Se for Aporte de Sócios, criar a divisão (rateio) em PurchaseSplit sobre o saldo restante
       if (fundingSource === 'PARTNER_CONTRIBUTION' && partnerIds && partnerIds.length > 0) {
-        const expectedPerPerson = Number((totalAmount / partnerIds.length).toFixed(2));
+        const amountToSplit = Math.max(0, totalAmount - bizCash);
+        const expectedPerPerson = Number((amountToSplit / partnerIds.length).toFixed(2));
         const splitsData = [];
 
         for (const pid of partnerIds) {
@@ -102,7 +121,12 @@ export async function POST(request) {
       });
     });
 
-    const sourceLabel = fundingSource === 'BUSINESS_CASH' ? 'Caixa de Vendas' : `Rateio entre ${partnerIds?.length || 1} Sócios`;
+    const sourceLabel = fundingSource === 'BUSINESS_CASH'
+      ? 'Caixa de Vendas'
+      : (bizCash > 0
+          ? `Rateio (${partnerIds?.length || 1} Sócios) + R$ ${bizCash.toFixed(2)} do Caixa`
+          : `Rateio entre ${partnerIds?.length || 1} Sócios`);
+
     await logAction({
       actionType: 'CRIAR',
       module: 'COMPRAS',

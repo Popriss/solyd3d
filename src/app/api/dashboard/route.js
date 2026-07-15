@@ -55,14 +55,22 @@ export async function GET() {
     });
     const totalVariableExpenses = variableExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
-    // 4.1 Compras registradas no Caixa de Vendas (BUSINESS_CASH)
+    // 4.1 Compras registradas ou com dedução no Caixa de Vendas
     const businessCashPurchases = await prisma.purchase.findMany({
       where: {
         purchaseDate: { gte: startOfMonth, lte: endOfMonth },
-        fundingSource: 'BUSINESS_CASH',
+        OR: [
+          { fundingSource: 'BUSINESS_CASH' },
+          { businessCashAmount: { gt: 0 } },
+        ],
       },
     });
-    const totalBusinessCashPurchases = businessCashPurchases.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const totalBusinessCashPurchases = businessCashPurchases.reduce((sum, p) => {
+      const amt = p.businessCashAmount !== null && p.businessCashAmount !== undefined
+        ? Number(p.businessCashAmount)
+        : (p.fundingSource === 'BUSINESS_CASH' ? Number(p.amount || 0) : 0);
+      return sum + amt;
+    }, 0);
 
     const totalMonthlyCost = totalFixedExpenses + totalVariableExpenses + totalProductionCost + totalCommissionPaid + totalBusinessCashPurchases;
     const estimatedNetProfit = totalRevenue - totalMonthlyCost;
@@ -98,7 +106,10 @@ export async function GET() {
     businessCashPurchases.forEach(p => {
       const dKey = new Date(p.purchaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       if (dailyMap[dKey]) {
-        dailyMap[dKey].cost += Number(p.amount || 0);
+        const amt = p.businessCashAmount !== null && p.businessCashAmount !== undefined
+          ? Number(p.businessCashAmount)
+          : (p.fundingSource === 'BUSINESS_CASH' ? Number(p.amount || 0) : 0);
+        dailyMap[dKey].cost += amt;
       }
     });
 

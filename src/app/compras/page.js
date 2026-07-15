@@ -21,7 +21,9 @@ export default function ComprasPage() {
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
   const [payMethod, setPayMethod] = useState('PIX');
+  const [installmentCount, setInstallmentCount] = useState('1');
   const [fundingSource, setFundingSource] = useState('BUSINESS_CASH');
+  const [businessCashAmount, setBusinessCashAmount] = useState('');
   const [selectedPartners, setSelectedPartners] = useState([]);
   const [paidByPartnerId, setPaidByPartnerId] = useState('');
   const [notes, setNotes] = useState('');
@@ -59,11 +61,14 @@ export default function ComprasPage() {
   // KPIs
   const totalSpent = purchases.reduce((sum, p) => sum + Number(p.amount || 0), 0);
   const totalBusinessCash = purchases
-    .filter((p) => p.fundingSource === 'BUSINESS_CASH')
-    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    .filter((p) => p.fundingSource === 'BUSINESS_CASH' || (p.businessCashAmount && Number(p.businessCashAmount) > 0))
+    .reduce((sum, p) => sum + (p.businessCashAmount !== null && p.businessCashAmount !== undefined ? Number(p.businessCashAmount) : Number(p.amount || 0)), 0);
   const totalPartnerContribution = purchases
     .filter((p) => p.fundingSource === 'PARTNER_CONTRIBUTION')
-    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    .reduce((sum, p) => {
+      const biz = p.businessCashAmount ? Number(p.businessCashAmount) : 0;
+      return sum + Math.max(0, Number(p.amount || 0) - biz);
+    }, 0);
   const totalPendingSplit = partners.reduce((sum, pt) => sum + Number(pt.pendingToPay || 0), 0);
 
   // Submit Nova Compra
@@ -87,7 +92,10 @@ export default function ComprasPage() {
           description: desc,
           amount: Number(amount),
           paymentMethod: payMethod,
+          installmentCount: payMethod === 'CREDIT_CARD' ? Number(installmentCount) : null,
+          installmentValue: payMethod === 'CREDIT_CARD' ? Number((Number(amount) / Number(installmentCount || 1)).toFixed(2)) : null,
           fundingSource,
+          businessCashAmount: fundingSource === 'PARTNER_CONTRIBUTION' && businessCashAmount ? Number(businessCashAmount) : null,
           paidByPartnerId: paidByPartnerId ? Number(paidByPartnerId) : null,
           partnerIds: selectedPartners,
           notes,
@@ -97,6 +105,8 @@ export default function ComprasPage() {
       if (res.ok) {
         setDesc('');
         setAmount('');
+        setInstallmentCount('1');
+        setBusinessCashAmount('');
         setNotes('');
         setPaidByPartnerId('');
         setShowPurchaseModal(false);
@@ -389,9 +399,14 @@ export default function ComprasPage() {
                             )}
                           </td>
                           <td>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block' }}>
                               {payMap[p.paymentMethod] || p.paymentMethod}
                             </span>
+                            {p.installmentCount && Number(p.installmentCount) > 1 && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--accent-indigo)', fontWeight: 600 }}>
+                                {p.installmentCount}x de {formatCurrency(p.installmentValue || Number(p.amount) / p.installmentCount)}/mês
+                              </span>
+                            )}
                           </td>
                           <td>
                             <strong style={{ color: isBusiness ? 'var(--accent-emerald)' : 'var(--accent-amber)', fontSize: '0.95rem' }}>
@@ -405,6 +420,11 @@ export default function ComprasPage() {
                               </span>
                             ) : (
                               <div>
+                                {p.businessCashAmount && Number(p.businessCashAmount) > 0 && (
+                                  <div style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>
+                                    + {formatCurrency(p.businessCashAmount)} do Caixa das Vendas
+                                  </div>
+                                )}
                                 {p.paidByPartner && (
                                   <div style={{ fontSize: '0.78rem', color: 'var(--accent-indigo)', fontWeight: 600 }}>
                                     Adiantado por: {p.paidByPartner.name}
@@ -708,6 +728,31 @@ export default function ComprasPage() {
                   </div>
                 </div>
 
+                {payMethod === 'CREDIT_CARD' && (
+                  <div style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid var(--accent-indigo)', borderRadius: 8, padding: 12, marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label className="form-label" style={{ margin: 0, fontWeight: 700, color: 'var(--accent-indigo)' }}>
+                        Quantidade de Parcelas:
+                      </label>
+                      <select
+                        className="form-input"
+                        style={{ width: 120, padding: '6px 10px' }}
+                        value={installmentCount}
+                        onChange={(e) => setInstallmentCount(e.target.value)}
+                      >
+                        {[...Array(24)].map((_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            {i + 1}x {i + 1 === 1 ? '(À Vista)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Ficará em: <span style={{ color: 'var(--accent-indigo)', fontSize: '1.05rem' }}>{formatCurrency(Number(amount || 0) / Number(installmentCount || 1))}</span> / mês
+                    </div>
+                  </div>
+                )}
+
                 <div className="form-group" style={{ marginTop: 16 }}>
                   <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                     Origem do Dinheiro (Funding Source) *
@@ -756,11 +801,34 @@ export default function ComprasPage() {
                 {/* PAINEL DINÂMICO SE FOR APORTE DE SÓCIOS */}
                 {fundingSource === 'PARTNER_CONTRIBUTION' && (
                   <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, marginTop: 16 }}>
+                    {/* QUANTIDADE DO CAIXA DO NEGÓCIO NO APORTE */}
+                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid var(--accent-emerald)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
+                      <label className="form-label" style={{ color: 'var(--accent-emerald)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 6px' }}>
+                        <Wallet size={15} /> Quantidade do Caixa do Negócio (Ajuda / Co-participação)
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1 1 180px' }}>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="form-input"
+                            placeholder="R$ 0,00 da empresa ajudou..."
+                            value={businessCashAmount}
+                            onChange={(e) => setBusinessCashAmount(e.target.value)}
+                          />
+                        </div>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                          Sai do Caixa: <strong style={{ color: 'var(--accent-emerald)' }}>{formatCurrency(businessCashAmount || 0)}</strong>
+                        </div>
+                      </div>
+                    </div>
+
                     <label className="form-label" style={{ color: 'var(--accent-indigo)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Users size={16} /> Rateio de Despesa — Dividir entre quais Sócios? ($X$ pessoas)
+                      <Users size={16} /> Rateio do Restante — Dividir entre quais Sócios? ($X$ pessoas)
                     </label>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
-                      Selecione os sócios que vão dividir esta compra. O sistema calculará R$ {(Number(amount || 0) / (selectedPartners.length || 1)).toFixed(2)} por pessoa.
+                      Valor a ratear ({formatCurrency(Math.max(0, Number(amount || 0) - Number(businessCashAmount || 0)))}): 
+                      O sistema calculará <strong style={{ color: 'var(--accent-indigo)' }}>R$ {(Math.max(0, Number(amount || 0) - Number(businessCashAmount || 0)) / (selectedPartners.length || 1)).toFixed(2)}</strong> por pessoa.
                     </p>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>

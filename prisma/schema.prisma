@@ -305,6 +305,9 @@ model Purchase {
   paymentMethod   String   @map("payment_method") // CREDIT_CARD, DEBIT_CARD, PIX
   fundingSource   String   @map("funding_source") // BUSINESS_CASH (Caixa de Vendas), PARTNER_CONTRIBUTION (Aporte Sócios)
   paidByPartnerId Int?     @map("paid_by_partner_id") // Sócio que adiantou/pagou a conta
+  installmentCount Int?    @map("installment_count") // Quantidade de parcelas (se Crédito)
+  installmentValue Decimal? @map("installment_value") @db.Decimal(10, 2) // Valor mensal de cada parcela
+  businessCashAmount Decimal? @map("business_cash_amount") @db.Decimal(10, 2) // Quantia que saiu/ajudou do Caixa de Vendas
   purchaseDate    DateTime @default(now()) @map("purchase_date") @db.Date
   notes           String?  @db.Text
   createdAt       DateTime @default(now()) @map("created_at")

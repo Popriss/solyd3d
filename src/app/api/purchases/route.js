@@ -103,6 +103,7 @@ export async function POST(request) {
             partnerId: partnerIdNum,
             amountExpected: expectedPerPerson,
             amountPaid: isPayer ? expectedPerPerson : 0,
+            installmentsPaid: isPayer ? (instCount || 1) : 0,
             status: isPayer ? 'SETTLED' : 'PENDING',
           });
         }

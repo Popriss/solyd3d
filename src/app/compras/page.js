@@ -34,6 +34,11 @@ export default function ComprasPage() {
   const [partnerEmail, setPartnerEmail] = useState('');
   const [partnerPhone, setPartnerPhone] = useState('');
 
+  // Form states - Quitar Parcelas no Cartão
+  const [splitModalData, setSplitModalData] = useState(null);
+  const [payInstallmentCountInput, setPayInstallmentCountInput] = useState('1');
+  const [payInstallmentValueInput, setPayInstallmentValueInput] = useState('');
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -181,6 +186,60 @@ export default function ComprasPage() {
       else alert('Erro ao quitar rateio.');
     } catch (err) {
       alert('Erro na requisição.');
+    }
+  };
+
+  // Abrir Modal de Quitar X Parcelas (Cartão de Crédito)
+  const handleOpenInstallmentModal = (split, purchase) => {
+    const totalInst = purchase.installmentCount || 1;
+    const paidInst = split.installmentsPaid || 0;
+    
+    setSplitModalData({ split, purchase });
+    setPayInstallmentCountInput('1');
+    const expectedPerInst = Number(split.amountExpected) / totalInst;
+    setPayInstallmentValueInput(expectedPerInst.toFixed(2));
+  };
+
+  // Submeter quitação de X parcelas no Cartão
+  const handleSettleInstallmentSubmit = async (e) => {
+    e.preventDefault();
+    if (!splitModalData) return;
+    const { split, purchase } = splitModalData;
+
+    const addedInst = Number(payInstallmentCountInput);
+    const addedVal = Number(payInstallmentValueInput);
+
+    if (addedInst <= 0 || addedVal <= 0) {
+      alert('Informe uma quantidade de parcelas e valor válidos (> 0).');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const newAmountPaid = Number(split.amountPaid || 0) + addedVal;
+      const newInstPaid = Number(split.installmentsPaid || 0) + addedInst;
+
+      const res = await fetch('/api/purchases/splits', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          splitId: split.id,
+          amountPaid: newAmountPaid,
+          installmentsPaid: newInstPaid,
+        }),
+      });
+
+      if (res.ok) {
+        setSplitModalData(null);
+        loadData();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Erro ao quitar parcelas.');
+      }
+    } catch (err) {
+      alert('Erro na requisição.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -581,12 +640,21 @@ export default function ComprasPage() {
                                   </strong>
                                 </td>
                                 <td>
-                                  <span style={{ color: isPending ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 600 }}>
+                                  <span style={{ color: isPending ? 'var(--accent-rose)' : 'var(--accent-emerald)', fontWeight: 600, display: 'block' }}>
                                     {formatCurrency(split.amountPaid)}
                                   </span>
+                                  {p.paymentMethod === 'CREDIT_CARD' && p.installmentCount && Number(p.installmentCount) > 1 && (
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-indigo)', fontWeight: 600 }}>
+                                      ({split.installmentsPaid || 0}/{p.installmentCount} parcelas quitadas)
+                                    </span>
+                                  )}
                                 </td>
                                 <td>
-                                  {isPending ? (
+                                  {isPending && split.installmentsPaid && Number(split.installmentsPaid) > 0 ? (
+                                    <span className="badge badge-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                      <CreditCard size={13} /> {split.installmentsPaid}/{p.installmentCount} Parcelas
+                                    </span>
+                                  ) : isPending ? (
                                     <span className="badge badge-rose" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                       <AlertCircle size={13} /> Devendo Aporte
                                     </span>
@@ -597,7 +665,26 @@ export default function ComprasPage() {
                                   )}
                                 </td>
                                 <td style={{ textAlign: 'right' }}>
-                                  {isPending && (
+                                  {isPending && p.paymentMethod === 'CREDIT_CARD' && p.installmentCount && Number(p.installmentCount) > 1 ? (
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
+                                      <button
+                                        onClick={() => handleOpenInstallmentModal(split, p)}
+                                        className="btn btn-primary"
+                                        style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                        title="Quitar Parcela(s) Específica(s)"
+                                      >
+                                        <CreditCard size={14} /> Quitar Parcelas
+                                      </button>
+                                      <button
+                                        onClick={() => handleSettleSplit(split.id)}
+                                        className="btn btn-secondary"
+                                        style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                        title="Quitar Saldo Total de uma vez"
+                                      >
+                                        <CheckCircle2 size={14} /> Total
+                                      </button>
+                                    </div>
+                                  ) : isPending ? (
                                     <button
                                       onClick={() => handleSettleSplit(split.id)}
                                       className="btn btn-primary"
@@ -605,7 +692,7 @@ export default function ComprasPage() {
                                     >
                                       <CheckCircle2 size={14} /> Registrar Depósito / Quitar
                                     </button>
-                                  )}
+                                  ) : null}
                                 </td>
                               </tr>
                             );
@@ -901,6 +988,94 @@ export default function ComprasPage() {
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
                   {submitting ? 'Salvando...' : 'Confirmar Registro de Compra'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: QUITAR X PARCELAS NO CARTÃO DE CRÉDITO */}
+      {splitModalData && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CreditCard size={20} style={{ color: 'var(--accent-indigo)' }} />
+                Quitar Parcelas de Cartão
+              </h3>
+              <button className="modal-close" onClick={() => setSplitModalData(null)}>×</button>
+            </div>
+            <form onSubmit={handleSettleInstallmentSubmit}>
+              <div className="modal-body">
+                <div style={{ background: 'var(--bg-primary)', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    <strong>Sócio:</strong> {splitModalData.split.partner?.name}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    <strong>Compra:</strong> {splitModalData.purchase.description} ({splitModalData.purchase.installmentCount}x no Cartão)
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-primary)', paddingTop: 6, marginTop: 6 }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                      Já quitado: R$ {Number(splitModalData.split.amountPaid || 0).toFixed(2)} ({splitModalData.split.installmentsPaid || 0}/{splitModalData.purchase.installmentCount} parc.)
+                    </span>
+                    <strong style={{ fontSize: '0.85rem', color: 'var(--accent-indigo)' }}>
+                      Cota Total: {formatCurrency(splitModalData.split.amountExpected)}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Quantas parcelas quitar agora? (X) *</label>
+                    <select
+                      className="form-input"
+                      value={payInstallmentCountInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPayInstallmentCountInput(val);
+                        const totalInst = splitModalData.purchase.installmentCount || 1;
+                        const expectedPerInst = Number(splitModalData.split.amountExpected) / totalInst;
+                        setPayInstallmentValueInput((Number(val) * expectedPerInst).toFixed(2));
+                      }}
+                      required
+                    >
+                      {(() => {
+                        const totalInst = splitModalData.purchase.installmentCount || 1;
+                        const paidInst = splitModalData.split.installmentsPaid || 0;
+                        const remInst = Math.max(1, totalInst - paidInst);
+                        return [...Array(remInst)].map((_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            {i + 1} parcela{i + 1 > 1 ? 's' : ''} {paidInst + i + 1 === totalInst ? '(Quita tudo)' : ''}
+                          </option>
+                        ));
+                      })()}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Valor do Aporte (Y - R$) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-input"
+                      value={payInstallmentValueInput}
+                      onChange={(e) => setPayInstallmentValueInput(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setSplitModalData(null)}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? 'Registrando...' : `Confirmar Quitação (${payInstallmentCountInput}x de ${formatCurrency(payInstallmentValueInput)})`}
                 </button>
               </div>
             </form>

@@ -21,13 +21,22 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Registro de rateio não encontrado' }, { status: 404 });
     }
 
+    // Se amountPaid for passado, usamos ele. Se não for, assumimos quitação integral do valor esperado.
     const newAmountPaid = amountPaid !== undefined ? Number(amountPaid) : Number(split.amountExpected);
-    const newStatus = newAmountPaid >= Number(split.amountExpected) ? 'SETTLED' : 'PENDING';
+    
+    // Se installmentsPaid for passado, usamos. Caso contrário, se o novo amountPaid quitou o total, usamos o total de parcelas da compra (ou 1).
+    const newInstallmentsPaid = installmentsPaid !== undefined
+      ? Number(installmentsPaid)
+      : (newAmountPaid >= Number(split.amountExpected) - 0.01 ? (split.purchase?.installmentCount || 1) : Number(split.installmentsPaid || 0));
+
+    const isTotalSettled = newAmountPaid >= Number(split.amountExpected) - 0.01 || (split.purchase?.installmentCount && newInstallmentsPaid >= split.purchase.installmentCount);
+    const newStatus = isTotalSettled ? 'SETTLED' : 'PENDING';
 
     const updated = await prisma.purchaseSplit.update({
       where: { id: Number(splitId) },
       data: {
         amountPaid: newAmountPaid,
+        installmentsPaid: newInstallmentsPaid,
         status: newStatus,
       },
       include: {
@@ -36,10 +45,14 @@ export async function PUT(request) {
       },
     });
 
+    const descMsg = installmentsPaid !== undefined
+      ? `Quitou ${newInstallmentsPaid} parcela(s) (Total Pago: R$ ${newAmountPaid.toFixed(2)}) da cota de ${split.partner.name} (Compra #${split.purchaseId}: ${split.purchase.description})`
+      : `Quitou R$ ${newAmountPaid.toFixed(2)} da cota de rateio de ${split.partner.name} (Compra #${split.purchaseId}: ${split.purchase.description})`;
+
     await logAction({
       actionType: 'CONCLUIR',
       module: 'COMPRAS',
-      description: `Quitou/Aportou R$ ${newAmountPaid.toFixed(2)} da cota de rateio de ${split.partner.name} (Compra #${split.purchaseId}: ${split.purchase.description})`,
+      description: descMsg,
     });
 
     return NextResponse.json(updated);

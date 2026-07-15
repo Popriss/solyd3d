@@ -325,6 +325,7 @@ model PurchaseSplit {
   partnerId      Int      @map("partner_id")
   amountExpected Decimal  @map("amount_expected") @db.Decimal(10, 2)
   amountPaid     Decimal  @default(0) @map("amount_paid") @db.Decimal(10, 2)
+  installmentsPaid Int?   @default(0) @map("installments_paid") // Quantidade de parcelas do cartão quitadas
   status         String   @default("PENDING") // PENDING (Devendo aporte), SETTLED (Aportado/Quitado)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")

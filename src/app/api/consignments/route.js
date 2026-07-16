@@ -108,23 +108,84 @@ export async function POST(request) {
   }
 }
 
-// PUT - Realizar Acerto da Consignação (registrar vendas, devoluções e perdas)
+// PUT - Realizar Acerto da Consignação, Reestoque (Encher Estoque) ou alterar preços de itens
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id, settlementDate, notes, items } = body;
+    const { id, action, itemId, unitPrice, costPrice, settlementDate, notes, items } = body;
 
-    if (!id || !items || !Array.isArray(items)) {
-      return NextResponse.json({ error: 'ID e itens do acerto são obrigatórios' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'ID da remessa obrigatório' }, { status: 400 });
     }
 
     const existing = await prisma.consignment.findUnique({
       where: { id: Number(id) },
-      include: { salesPoint: true, items: true },
+      include: { salesPoint: true, items: { include: { product: true } } },
     });
 
     if (!existing) {
       return NextResponse.json({ error: 'Remessa não encontrada' }, { status: 404 });
+    }
+
+    // 1. AÇÃO: ALTERAR PREÇO OU CUSTO DO ITEM LIVREMENTE NO PARCEIRO
+    if (action === 'UPDATE_ITEM_PRICE' && itemId) {
+      const updatedItem = await prisma.consignmentItem.update({
+        where: { id: Number(itemId) },
+        data: {
+          unitPrice: unitPrice !== undefined ? Number(unitPrice) : undefined,
+          costPrice: costPrice !== undefined ? Number(costPrice) : undefined,
+        },
+      });
+      return NextResponse.json(updatedItem);
+    }
+
+    // 2. AÇÃO: ENCHER ESTOQUE (RESTOCK -> Gerar OPs automáticas para o que falta na banca)
+    if (action === 'RESTOCK') {
+      const activeRoll = await prisma.filamentRoll.findFirst({ where: { active: true } }) || await prisma.filamentRoll.findFirst();
+      const activeMachine = await prisma.machine.findFirst({ where: { status: 'ACTIVE' } }) || await prisma.machine.findFirst();
+
+      if (!activeRoll || !activeMachine) {
+        return NextResponse.json({ error: 'Para gerar OPs de reestoque, cadastre pelo menos 1 Filamento e 1 Máquina ativos.' }, { status: 400 });
+      }
+
+      const generatedOps = [];
+      for (const item of existing.items) {
+        const target = item.targetQuota ? Number(item.targetQuota) : Number(item.quantitySent);
+        const currentStockInBanca = Number(item.quantitySent) - Number(item.quantitySold) - Number(item.quantityReturned) - Number(item.quantityLost);
+        const missingQty = target - currentStockInBanca;
+
+        if (missingQty > 0) {
+          const op = await prisma.productionOrder.create({
+            data: {
+              productId: item.productId,
+              filamentRollId: activeRoll.id,
+              machineId: activeMachine.id,
+              status: 'QUEUED',
+              quantity: missingQty,
+              destinationType: 'SALES_POINT',
+              destinationName: existing.salesPoint.name,
+              notes: `[Encher Estoque - Remessa #${existing.id}] ${missingQty}x ${item.product?.name || 'Peça'} para ${existing.salesPoint.name}`,
+            },
+          });
+          generatedOps.push(op);
+
+          // Atualizar o item da consignação para prever o reestoque que chegará (ou apenas deixamos a OP para quando for enviada uma nova remessa)
+        }
+      }
+
+      await logAction({
+        userName: 'Sistema',
+        userEmail: 'admin@solyd3d.com',
+        actionType: 'CRIAR',
+        module: 'PRODUCAO',
+        description: `Disparou Encher Estoque para a remessa #${existing.id} (${existing.salesPoint.name}): ${generatedOps.length} OPs geradas na fila.`,
+      });
+
+      return NextResponse.json({ success: true, generatedOps });
+    }
+
+    if (!items || !Array.isArray(items)) {
+      return NextResponse.json({ error: 'Itens do acerto são obrigatórios' }, { status: 400 });
     }
 
     const commissionPct = Number(existing.salesPoint.commissionPct || 0);

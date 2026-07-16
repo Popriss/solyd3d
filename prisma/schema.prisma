@@ -162,6 +162,7 @@ model Product {
 
   productionOrders ProductionOrder[]
   consignmentItems ConsignmentItem[]
+  saleItems        SaleItem[]
 
   @@map("products")
 }
@@ -183,6 +184,11 @@ model ProductionOrder {
   totalCost        Decimal?  @map("total_cost") @db.Decimal(10, 2)
   notes            String?   @db.Text
   isFailure        Boolean   @default(false) @map("is_failure")
+  quantity           Int       @default(1)
+  destinationType    String?   @map("destination_type") // SALES_POINT, DIRECT_SALE, ORDER
+  destinationName    String?   @map("destination_name")
+  saleId             Int?      @map("sale_id")
+  saleItemId         Int?      @map("sale_item_id")
   startedAt        DateTime? @map("started_at")
   finishedAt       DateTime? @map("finished_at")
   createdAt        DateTime  @default(now()) @map("created_at")
@@ -191,6 +197,8 @@ model ProductionOrder {
   product      Product      @relation(fields: [productId], references: [id])
   filamentRoll FilamentRoll @relation(fields: [filamentRollId], references: [id])
   machine      Machine      @relation(fields: [machineId], references: [id])
+  sale         Sale?        @relation(fields: [saleId], references: [id])
+  saleItem     SaleItem?    @relation(fields: [saleItemId], references: [id])
 
   @@map("production_orders")
 }
@@ -250,14 +258,18 @@ model SalesPoint {
   name          String
   type          String   @default("BANCA") // BANCA, LOJA, FEIRA, DIRETO
   location      String?
+  address       String?
   contactName   String?  @map("contact_name")
   contactPhone  String?  @map("contact_phone")
+  documentId    String?  @map("document_id")
+  pixKey        String?  @map("pix_key")
   commissionPct Decimal  @default(15) @map("commission_pct") @db.Decimal(5, 2)
   notes         String?  @db.Text
   status        String   @default("ACTIVE") // ACTIVE, INACTIVE
   createdAt     DateTime @default(now()) @map("created_at")
 
   consignments  Consignment[]
+  sales         Sale[]
 
   @@map("sales_points")
 }
@@ -289,6 +301,7 @@ model ConsignmentItem {
   quantitySold      Int      @default(0) @map("quantity_sold")
   quantityReturned  Int      @default(0) @map("quantity_returned")
   quantityLost      Int      @default(0) @map("quantity_lost")
+  targetQuota       Int?     @map("target_quota")
   unitPrice         Decimal  @db.Decimal(10, 2) @map("unit_price")
   costPrice         Decimal  @default(0) @db.Decimal(10, 2) @map("cost_price")
   totalSoldValue    Decimal  @default(0) @db.Decimal(10, 2) @map("total_sold_value")
@@ -299,6 +312,48 @@ model ConsignmentItem {
   product           Product     @relation(fields: [productId], references: [id])
 
   @@map("consignment_items")
+}
+
+// ============================================
+// VENDAS DIRETAS / SOB DEMANDA
+// ============================================
+
+model Sale {
+  id                    Int       @id @default(autoincrement())
+  salesPointId          Int?      @map("sales_point_id")
+  customerName          String    @map("customer_name")
+  customerContact       String?   @map("customer_contact")
+  status                String    @default("ACTIVE") // ACTIVE, PAID, CANCELLED
+  totalAmount           Decimal   @default(0) @map("total_amount") @db.Decimal(10, 2)
+  estimatedPrintMinutes Int       @default(0) @map("estimated_print_minutes")
+  proofFileUrl          String?   @map("proof_file_url") @db.Text
+  proofFileName         String?   @map("proof_file_name")
+  notes                 String?   @db.Text
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  salesPoint            SalesPoint?       @relation(fields: [salesPointId], references: [id])
+  items                 SaleItem[]
+  productionOrders      ProductionOrder[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id               Int       @id @default(autoincrement())
+  saleId           Int       @map("sale_id")
+  productId        Int       @map("product_id")
+  quantity         Int       @default(1)
+  unitPrice        Decimal   @map("unit_price") @db.Decimal(10, 2)
+  unitCost         Decimal?  @map("unit_cost") @db.Decimal(10, 2)
+  totalPrice       Decimal   @map("total_price") @db.Decimal(10, 2)
+  estimatedMinutes Int       @default(0) @map("estimated_minutes")
+
+  sale             Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product          Product          @relation(fields: [productId], references: [id])
+  productionOrders ProductionOrder[]
+
+  @@map("sale_items")
 }
 
 // ============================================

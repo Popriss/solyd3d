@@ -25,25 +25,28 @@ export default function ProducaoPage() {
   const [products, setProducts] = useState([]);
   const [rolls, setRolls] = useState([]);
   const [machines, setMachines] = useState([]);
+  const [salesPoints, setSalesPoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [form, setForm] = useState({ productId: '', filamentRollId: '', machineId: '', notes: '' });
+  const [form, setForm] = useState({ productId: '', filamentRollId: '', machineId: '', quantity: '1', destinationType: 'DIRECT_SALE', destinationName: '', notes: '' });
   const [statusForm, setStatusForm] = useState({ status: '', actualWeightG: '', actualPrintMinutes: '' });
 
   const fetchAll = useCallback(async () => {
     try {
-      const [ordersRes, productsRes, rollsRes, machinesRes] = await Promise.all([
+      const [ordersRes, productsRes, rollsRes, machinesRes, spRes] = await Promise.all([
         fetch('/api/production-orders'),
         fetch('/api/products'),
         fetch('/api/filament-rolls'),
         fetch('/api/machines'),
+        fetch('/api/sales-points'),
       ]);
       setOrders(await ordersRes.json().then(d => Array.isArray(d) ? d : []));
       setProducts(await productsRes.json().then(d => Array.isArray(d) ? d : []));
       setRolls(await rollsRes.json().then(d => Array.isArray(d) ? d : []));
       setMachines(await machinesRes.json().then(d => Array.isArray(d) ? d : []));
+      setSalesPoints(await spRes.json().then(d => Array.isArray(d) ? d : []));
     } catch { /* empty */ }
     finally { setLoading(false); }
   }, []);
@@ -137,6 +140,7 @@ export default function ProducaoPage() {
             <tr>
               <th>#</th>
               <th>Produto</th>
+              <th>Qtd & Destino</th>
               <th>Filamento Ativo</th>
               <th>Máquina</th>
               <th>Custo Calc.</th>
@@ -147,9 +151,9 @@ export default function ProducaoPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="8" style={{ textAlign: 'center', padding: 40 }}><div className="spinner" style={{ margin: '0 auto' }}></div></td></tr>
+              <tr><td colSpan="9" style={{ textAlign: 'center', padding: 40 }}><div className="spinner" style={{ margin: '0 auto' }}></div></td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan="8">
+              <tr><td colSpan="9">
                 <div className="empty-state">
                   <Factory />
                   <div className="empty-state-title">Nenhuma ordem de produção registrada</div>
@@ -158,6 +162,8 @@ export default function ProducaoPage() {
               </td></tr>
             ) : orders.map(order => {
               const StatusIcon = statusIcons[order.status] || Clock;
+              const destBadge = order.destinationType === 'SALES_POINT' ? 'badge-indigo' : order.destinationType === 'ORDER' ? 'badge-cyan' : 'badge-amber';
+              const destLabel = order.destinationName || (order.destinationType === 'SALES_POINT' ? 'Ponto de Venda' : order.destinationType === 'ORDER' ? 'Encomenda' : 'Venda Avulsa / Estoque');
               return (
                 <tr key={order.id}>
                   <td><strong>#{order.id}</strong></td>
@@ -166,6 +172,12 @@ export default function ProducaoPage() {
                     <div style={{ fontSize: 12, color: '#64748b' }}>
                       {formatWeight(order.actualWeightG || order.product?.estimatedWeightG)} — {formatDuration(order.actualPrintMinutes || order.product?.estimatedPrintMinutes)}
                     </div>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: 4 }}>{order.quantity || 1} unid.</div>
+                    <span className={`badge ${destBadge}`} style={{ fontSize: '0.75rem' }}>
+                      📍 {destLabel}
+                    </span>
                   </td>
                   <td>
                     {order.filamentRoll ? (
@@ -224,13 +236,63 @@ export default function ProducaoPage() {
                 {products.length === 0 && (
                   <div className="alert alert-warning"><AlertTriangle size={16} /><span>Cadastre produtos antes de criar ordens.</span></div>
                 )}
-                <div className="form-group">
-                  <label className="form-label">Produto</label>
-                  <select className="form-select" value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })} required>
-                    <option value="">Selecionar produto...</option>
-                    {products.map(p => <option key={p.id} value={p.id}>{p.name} ({formatWeight(p.estimatedWeightG)})</option>)}
-                  </select>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Produto</label>
+                    <select className="form-select" value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })} required>
+                      <option value="">Selecionar produto...</option>
+                      {products.map(p => <option key={p.id} value={p.id}>{p.name} ({formatWeight(p.estimatedWeightG)})</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Quantidade de Peças</label>
+                    <input className="form-input" type="number" min="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} required />
+                  </div>
                 </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Para Quem? (Destino)</label>
+                    <select
+                      className="form-select"
+                      value={form.destinationType}
+                      onChange={e => setForm({ ...form, destinationType: e.target.value, destinationName: '' })}
+                    >
+                      <option value="DIRECT_SALE">🛒 Venda Avulsa / Direta (Por fora)</option>
+                      <option value="ORDER">📦 Encomenda / Sob Medida</option>
+                      <option value="SALES_POINT">📍 Ponto de Venda Cadastrado</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">{form.destinationType === 'SALES_POINT' ? 'Selecione o Ponto de Venda' : 'Nome do Cliente / Destinatário'}</label>
+                    {form.destinationType === 'SALES_POINT' ? (
+                      <select
+                        className="form-select"
+                        value={form.destinationName}
+                        onChange={e => setForm({ ...form, destinationName: e.target.value })}
+                        required
+                      >
+                        <option value="">Escolher comércio parceiro...</option>
+                        {salesPoints.map(sp => <option key={sp.id} value={sp.name}>{sp.name}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        className="form-input"
+                        placeholder="ex: Vizinha Maria, Cliente Balcão..."
+                        value={form.destinationName}
+                        onChange={e => setForm({ ...form, destinationName: e.target.value })}
+                        required
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {(form.destinationType === 'DIRECT_SALE' || form.destinationType === 'ORDER') && form.destinationName && (
+                  <div className="alert alert-info" style={{ marginBottom: 12, fontSize: '0.8rem' }}>
+                    💡 <strong>Gatilho Reverso de Venda:</strong> Ao salvar esta OP, o sistema gerará automaticamente uma cobrança para <strong>{form.destinationName}</strong> na aba de <strong>Vendas Diretas</strong> para você não esquecer de receber!
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label className="form-label">Filamento (Apenas Filamentos com Status Ativo)</label>
                   <select className="form-select" value={form.filamentRollId} onChange={e => setForm({ ...form, filamentRollId: e.target.value })} required>

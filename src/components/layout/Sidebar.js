@@ -4,15 +4,16 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   LayoutDashboard, Package, Boxes, Factory, DollarSign,
-  Settings, Printer, Store, ShoppingBag, Users, ShoppingCart, Calculator
+  Settings, Printer, Store, ShoppingBag, Users, ShoppingCart, Calculator, Truck
 } from 'lucide-react';
 
 const navItems = [
   { section: 'Principal' },
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { section: 'Comercial' },
-  { href: '/vendas/pontos', label: 'Comércios / Bancas', icon: Store },
-  { href: '/vendas', label: 'Remessas / Acertos', icon: ShoppingBag },
+  { href: '/vendas/pontos', label: 'Pontos de Venda', icon: Store },
+  { href: '/vendas', label: 'Vendas Diretas', icon: ShoppingBag },
+  { href: '/remessas', label: 'Remessas / Acertos', icon: Truck },
   { section: 'Operações' },
   { href: '/calculadora', label: 'Calculadora de Impressão', icon: Calculator },
   { href: '/estoque', label: 'Estoque de Insumos', icon: Boxes },

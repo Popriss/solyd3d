@@ -25,14 +25,56 @@ export async function GET() {
   }
 }
 
-// POST - Criar ordem de produção
+// POST - Criar ordem de produção (e Gatilho Reverso de Venda se for Avulsa ou Encomenda)
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { productId, filamentRollId, machineId, notes } = body;
+    const { productId, filamentRollId, machineId, notes, quantity, destinationType, destinationName, saleId, saleItemId } = body;
 
     if (!productId || !filamentRollId || !machineId) {
       return NextResponse.json({ error: 'Campos obrigatórios faltando' }, { status: 400 });
+    }
+
+    const qty = Number(quantity) || 1;
+    const product = await prisma.product.findUnique({ where: { id: Number(productId) } });
+    const roll = await prisma.filamentRoll.findUnique({ where: { id: Number(filamentRollId) } });
+
+    let linkedSaleId = saleId ? Number(saleId) : null;
+    let linkedSaleItemId = saleItemId ? Number(saleItemId) : null;
+
+    // GATILHO REVERSO: Se for Venda Avulsa ou Encomenda e ainda não tiver Venda atrelada, criar uma Venda em /vendas automaticamente!
+    if (!linkedSaleId && (destinationType === 'DIRECT_SALE' || destinationType === 'ORDER') && destinationName && product) {
+      const unitPrice = Number(product.salePrice || 25.0);
+      const totalPrice = unitPrice * qty;
+      const estimatedMinutes = (Number(product.estimatedPrintMinutes) || 60) * qty;
+      const costPerGram = roll ? Number(roll.costPerRoll || 150) / Number(roll.initialWeightG || 1000) : 0.15;
+      const unitCost = Number(product.estimatedWeightG || 50) * costPerGram + 3.0;
+
+      const reverseSale = await prisma.sale.create({
+        data: {
+          customerName: destinationName,
+          status: 'ACTIVE',
+          totalAmount: totalPrice,
+          estimatedPrintMinutes: estimatedMinutes,
+          notes: `[Gatilho Reverso OP] Criada via Ordem de Produção manual — ${qty}x ${product.name}`,
+          items: {
+            create: {
+              productId: product.id,
+              quantity: qty,
+              unitPrice,
+              unitCost,
+              totalPrice,
+              estimatedMinutes,
+            },
+          },
+        },
+        include: { items: true },
+      });
+
+      linkedSaleId = reverseSale.id;
+      if (reverseSale.items[0]) {
+        linkedSaleItemId = reverseSale.items[0].id;
+      }
     }
 
     const order = await prisma.productionOrder.create({
@@ -41,16 +83,22 @@ export async function POST(request) {
         filamentRollId: Number(filamentRollId),
         machineId: Number(machineId),
         status: 'QUEUED',
+        quantity: qty,
+        destinationType: destinationType || null,
+        destinationName: destinationName || null,
+        saleId: linkedSaleId,
+        saleItemId: linkedSaleItemId,
         notes: notes || null,
       },
       include: {
         product: true,
         filamentRoll: true,
         machine: true,
+        sale: true,
       },
     });
 
-    await logAction({ actionType: 'CRIAR', module: 'PRODUCAO', description: `Criou ordem de produção #${order.id} (${order.product?.name || 'Peça 3D'})` });
+    await logAction({ actionType: 'CRIAR', module: 'PRODUCAO', description: `Criou ordem de produção #${order.id} (${qty}x ${order.product?.name || 'Peça 3D'})${destinationName ? ' para ' + destinationName : ''}` });
 
     return NextResponse.json(order, { status: 201 });
   } catch (error) {

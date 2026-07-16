@@ -84,10 +84,10 @@ model FilamentRoll {
   color            String
   brand            String
   initialWeightG   Decimal   @map("initial_weight_g") @db.Decimal(10, 2)
-  remainingWeightG Decimal   @map("remaining_weight_g") @db.Decimal(10, 2)
   costPerRoll      Decimal   @map("cost_per_roll") @db.Decimal(10, 2)
   costPerGram      Decimal   @map("cost_per_gram") @db.Decimal(10, 4)
-  status           FilamentStatus @default(AVAILABLE)
+  active           Boolean   @default(true) @map("is_active")
+  status           FilamentStatus? @default(AVAILABLE)
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
@@ -105,6 +105,23 @@ enum FilamentStatus {
 }
 
 // ============================================
+// INSUMOS EXTRAS E HARDWARE (CHAVEIROS, FECHOS, PARAFUSOS)
+// ============================================
+
+model SupplyItem {
+  id               Int      @id @default(autoincrement())
+  name             String
+  category         String?  // Hardware, Embalagem, Acessório
+  unitCost         Decimal  @map("unit_cost") @db.Decimal(10, 4)
+  stockQuantity    Int      @default(0) @map("stock_quantity")
+  active           Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("supply_items")
+}
+
+// ============================================
 // CATÁLOGO DE PRODUTOS
 // ============================================
 
@@ -118,8 +135,28 @@ model Product {
   recommendedMaterial  String?  @map("recommended_material")
   recommendedColor     String?  @map("recommended_color")
   profitMarginPct      Decimal  @default(50) @map("profit_margin_pct") @db.Decimal(5, 2)
+  salePrice            Decimal? @map("sale_price") @db.Decimal(10, 2)
+  powerWatts           Decimal? @map("power_watts") @db.Decimal(8, 2)
   imageUrl             String?  @map("image_url")
   stockReady           Int      @default(0) @map("stock_ready")
+
+  // Suporte a Multicolor (até 3 cores)
+  color1               String?
+  weight1G             Decimal? @map("weight1_g") @db.Decimal(10, 2)
+  time1Min             Int?     @map("time1_min")
+  color2               String?
+  weight2G             Decimal? @map("weight2_g") @db.Decimal(10, 2)
+  time2Min             Int?     @map("time2_min")
+  color3               String?
+  weight3G             Decimal? @map("weight3_g") @db.Decimal(10, 2)
+  time3Min             Int?     @map("time3_min")
+
+  // Suporte a Insumos / Hardware (até 2 itens extras)
+  extra1Name           String?  @map("extra1_name")
+  extra1Qty            Int?     @map("extra1_qty")
+  extra2Name           String?  @map("extra2_name")
+  extra2Qty            Int?     @map("extra2_qty")
+
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 

@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { calculateCostPerGram, determineFilamentStatus } from '@/lib/calculations';
+import { calculateCostPerGram } from '@/lib/calculations';
 import { logAction } from '@/lib/activityLogger';
 
-// GET - Listar todos os rolos
-export async function GET() {
+// GET - Listar todos os rolos (com suporte a filtro por ativos)
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const activeOnly = searchParams.get('activeOnly');
+
+    const where = activeOnly === 'true' ? { active: true } : {};
+
     const rolls = await prisma.filamentRoll.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: { _count: { select: { productionOrders: true } } },
     });
@@ -17,11 +23,11 @@ export async function GET() {
   }
 }
 
-// POST - Criar novo rolo
+// POST - Criar novo rolo de filamento (Ativo)
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { material, color, brand, initialWeightG, costPerRoll } = body;
+    const { material, color, brand, initialWeightG, costPerRoll, active } = body;
 
     if (!material || !color || !brand || !initialWeightG || !costPerRoll) {
       return NextResponse.json({ error: 'Campos obrigatórios faltando' }, { status: 400 });
@@ -35,14 +41,14 @@ export async function POST(request) {
         color,
         brand,
         initialWeightG: Number(initialWeightG),
-        remainingWeightG: Number(initialWeightG),
         costPerRoll: Number(costPerRoll),
         costPerGram,
+        active: active !== undefined ? Boolean(active) : true,
         status: 'AVAILABLE',
       },
     });
 
-    await logAction({ actionType: 'CRIAR', module: 'ESTOQUE', description: `Cadastrou rolo de filamento: ${roll.material} ${roll.color} (${roll.brand})` });
+    await logAction({ actionType: 'CRIAR', module: 'ESTOQUE', description: `Cadastrou filamento ativo: ${roll.material} ${roll.color} (${roll.brand} — R$ ${Number(roll.costPerGram).toFixed(4)}/g)` });
 
     return NextResponse.json(roll, { status: 201 });
   } catch (error) {
@@ -51,7 +57,7 @@ export async function POST(request) {
   }
 }
 
-// PUT - Atualizar rolo
+// PUT - Atualizar filamento (Toggle Ativo/Inativo e Atualização Rápida de Preço)
 export async function PUT(request) {
   try {
     const body = await request.json();
@@ -61,14 +67,26 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
     }
 
-    // Recalcular custo por grama se necessário
-    if (data.costPerRoll && data.initialWeightG) {
-      data.costPerGram = calculateCostPerGram(Number(data.costPerRoll), Number(data.initialWeightG));
+    // Recalcular custo por grama se o preço ou peso inicial mudaram
+    if (data.costPerRoll !== undefined || data.initialWeightG !== undefined) {
+      const current = await prisma.filamentRoll.findUnique({ where: { id: Number(id) } });
+      if (!current) return NextResponse.json({ error: 'Filamento não encontrado' }, { status: 404 });
+
+      const newCost = data.costPerRoll !== undefined ? Number(data.costPerRoll) : Number(current.costPerRoll);
+      const newWeight = data.initialWeightG !== undefined ? Number(data.initialWeightG) : Number(current.initialWeightG);
+
+      data.costPerRoll = newCost;
+      data.initialWeightG = newWeight;
+      data.costPerGram = calculateCostPerGram(newCost, newWeight);
+      // Sempre que atualizar com novo preço/compra, garante que o filamento volta para Ativo
+      if (data.isPriceUpdate) {
+        data.active = true;
+        delete data.isPriceUpdate;
+      }
     }
 
-    // Atualizar status baseado no peso restante
-    if (data.remainingWeightG !== undefined) {
-      data.status = determineFilamentStatus(Number(data.remainingWeightG));
+    if (data.active !== undefined) {
+      data.active = Boolean(data.active);
     }
 
     const roll = await prisma.filamentRoll.update({
@@ -76,7 +94,8 @@ export async function PUT(request) {
       data,
     });
 
-    await logAction({ actionType: 'ATUALIZAR', module: 'ESTOQUE', description: `Atualizou rolo de filamento #${roll.id} (${roll.material} ${roll.color})` });
+    const statusText = roll.active ? 'Ativo' : 'Inativo';
+    await logAction({ actionType: 'ATUALIZAR', module: 'ESTOQUE', description: `Atualizou filamento #${roll.id} (${roll.material} ${roll.color}) — Status: ${statusText}` });
 
     return NextResponse.json(roll);
   } catch (error) {

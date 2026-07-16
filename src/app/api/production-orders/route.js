@@ -3,8 +3,7 @@ import prisma from '@/lib/prisma';
 import {
   calculateMaterialCost,
   calculateEnergyCost,
-  calculateTotalCost,
-  determineFilamentStatus
+  calculateTotalCost
 } from '@/lib/calculations';
 import { logAction } from '@/lib/activityLogger';
 
@@ -14,8 +13,8 @@ export async function GET() {
     const orders = await prisma.productionOrder.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        product: { select: { id: true, name: true, estimatedWeightG: true, estimatedPrintMinutes: true } },
-        filamentRoll: { select: { id: true, material: true, color: true, brand: true, costPerGram: true, remainingWeightG: true } },
+        product: true,
+        filamentRoll: true,
         machine: { select: { id: true, name: true, powerWatts: true } },
       },
     });
@@ -60,7 +59,7 @@ export async function POST(request) {
   }
 }
 
-// PUT - Atualizar status da ordem (inclui baixa de estoque)
+// PUT - Atualizar status da ordem (Custeio Qualitativo sem baixa no estoque de filamento)
 export async function PUT(request) {
   try {
     const body = await request.json();
@@ -90,7 +89,8 @@ export async function PUT(request) {
         updateData.startedAt = new Date();
       }
 
-      // Ao finalizar ou falhar: calcular custos e deduzir estoque
+      // Ao finalizar ou falhar: calcular custos puramente com base no custo por grama do filamento ativo
+      // REGRA DE OURO: Nenhuma quantidade em gramas é subtraída do banco de dados (baixa abolida)
       if (status === 'COMPLETED' || status === 'FAILED') {
         updateData.finishedAt = new Date();
         updateData.isFailure = status === 'FAILED';
@@ -104,7 +104,8 @@ export async function PUT(request) {
         });
         const kwhPrice = energyConfig ? Number(energyConfig.kwhPrice) : 0.85;
 
-        const matCost = calculateMaterialCost(weightUsed, Number(existingOrder.filamentRoll.costPerGram));
+        const costPerGram = existingOrder.filamentRoll ? Number(existingOrder.filamentRoll.costPerGram) : 0.12;
+        const matCost = calculateMaterialCost(weightUsed, costPerGram);
         const enCost = calculateEnergyCost(Number(existingOrder.machine.powerWatts), printMins, kwhPrice);
 
         updateData.actualWeightG = weightUsed;
@@ -112,16 +113,6 @@ export async function PUT(request) {
         updateData.materialCost = matCost;
         updateData.energyCost = enCost;
         updateData.totalCost = calculateTotalCost(matCost, enCost);
-
-        // BAIXA DE ESTOQUE — deduz do rolo (inclusive em falhas)
-        const newRemaining = Math.max(0, Number(existingOrder.filamentRoll.remainingWeightG) - weightUsed);
-        await prisma.filamentRoll.update({
-          where: { id: existingOrder.filamentRollId },
-          data: {
-            remainingWeightG: newRemaining,
-            status: determineFilamentStatus(newRemaining),
-          },
-        });
 
         // Se finalizou com sucesso (COMPLETED), entra no Estoque Pronto do produto
         if (status === 'COMPLETED' && existingOrder.status !== 'COMPLETED') {

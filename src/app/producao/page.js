@@ -221,6 +221,13 @@ export default function ProducaoPage() {
                         <strong>{formatCurrency(order.totalCost)}</strong>
                         <div style={{ fontSize: 11, color: '#64748b' }}>Mat: {formatCurrency(order.materialCost)} | En: {formatCurrency(order.energyCost)}</div>
                       </div>
+                    ) : order.product && order.filamentRoll ? (
+                      <div>
+                        <strong style={{ color: '#818cf8', fontWeight: 600 }}>
+                          ~ {formatCurrency(((Number(order.product.estimatedWeightG || 0) * Number(order.filamentRoll.costPerGram || 0.12)) + (((Number(order.machine?.powerWatts || 150) / 1000) * (Number(order.product.estimatedPrintMinutes || 60) / 60)) * 0.85)) * (order.quantity || 1))}
+                        </strong>
+                        <div style={{ fontSize: 11, color: '#818cf8', fontStyle: 'italic' }}>Estimado (Pré-Conclusão)</div>
+                      </div>
                     ) : '-'}
                   </td>
                   <td>

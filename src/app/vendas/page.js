@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ShoppingBag, Plus, Calendar, CheckCircle2, AlertCircle, Clock, DollarSign, Package, X, Edit, Trash2, Printer, Upload, FileText, Check, Lock } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/formatters';
@@ -8,6 +8,7 @@ function VendasContent() {
   const searchParams = useSearchParams();
   const prefillClientId = searchParams.get('clientId');
   const prefillClientName = searchParams.get('clientName');
+  const prefillHandledRef = useRef(false);
 
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
@@ -48,8 +49,9 @@ function VendasContent() {
       const points = await spRes.json().then(d => Array.isArray(d) ? d : []);
       setSalesPoints(points);
 
-      // Se veio parâmetro da URL para iniciar venda (via CRM Pontos de Venda)
-      if (prefillClientName && !showCreateModal && prods.length > 0) {
+      // Se veio parâmetro da URL para iniciar venda (via CRM Pontos de Venda) apenas uma vez
+      if (prefillClientName && !prefillHandledRef.current && prods.length > 0) {
+        prefillHandledRef.current = true;
         setForm({
           salesPointId: prefillClientId || '',
           customerName: prefillClientName,
@@ -58,10 +60,13 @@ function VendasContent() {
         });
         setFormItems([{ productId: prods[0].id, quantity: '1', unitPrice: prods[0].salePrice || '25.00' }]);
         setShowCreateModal(true);
+        if (typeof window !== 'undefined') {
+          window.history.replaceState(null, '', '/vendas');
+        }
       }
     } catch { /* empty */ }
     finally { setLoading(false); }
-  }, [prefillClientId, prefillClientName, showCreateModal]);
+  }, [prefillClientId, prefillClientName]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

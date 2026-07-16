@@ -14,7 +14,7 @@ const navItems = [
   { href: '/vendas/pontos', label: 'Comércios / Bancas', icon: Store },
   { href: '/vendas', label: 'Remessas / Acertos', icon: ShoppingBag },
   { section: 'Operações' },
-  { href: '/calculadora', label: 'Calculadora V2', icon: Calculator },
+  { href: '/calculadora', label: 'Calculadora de Impressão', icon: Calculator },
   { href: '/estoque', label: 'Estoque de Insumos', icon: Boxes },
   { href: '/produtos', label: 'Catálogo de Peças', icon: Package },
   { href: '/producao', label: 'Produção', icon: Factory },

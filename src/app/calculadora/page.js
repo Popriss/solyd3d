@@ -187,7 +187,7 @@ export default function CalculadoraPage() {
 
     const colorDetails = colors.filter(c => c.weight > 0).map(c => `${c.name}: ${c.weight}g (${rolls.find(r => r.id === Number(c.rollId))?.color || 'Filamento'})`).join(' | ');
     const extraDetails = extras.filter(e => e.qty > 0).map(e => `${e.qty}x ${e.name}`).join(' | ');
-    const notes = `[Calculadora V2] Composição: ${colorDetails || totalWeight + 'g'}${extraDetails ? ' + Extras: ' + extraDetails : ''}. Custo Real Estimado: R$ ${totalCost.toFixed(2)}`;
+    const notes = `[Calculadora] Composição: ${colorDetails || totalWeight + 'g'}${extraDetails ? ' + Extras: ' + extraDetails : ''}. Custo Real Estimado: R$ ${totalCost.toFixed(2)}`;
 
     try {
       const res = await fetch('/api/production-orders', {
@@ -215,7 +215,7 @@ export default function CalculadoraPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Sparkles className="text-amber-400" size={24} /> Calculadora de Impressão V2
+            <Sparkles className="text-amber-400" size={24} /> Calculadora de Impressão
           </h1>
           <p className="page-subtitle">Simulação dinâmica multicolorida (3 Cores) + Insumos de Hardware + Override na hora</p>
         </div>

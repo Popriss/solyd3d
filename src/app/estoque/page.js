@@ -213,18 +213,20 @@ export default function EstoquePage() {
       {/* Tabs */}
       <div className="tabs-header" style={{ marginBottom: 20 }}>
         <button
+          type="button"
           className={`tab-btn ${activeTab === 'filaments' ? 'active' : ''}`}
           onClick={() => setActiveTab('filaments')}
         >
-          <Boxes size={16} style={{ marginRight: 8 }} />
-          🧵 Catálogo de Filamentos Ativos ({rolls.length})
+          <Boxes size={18} />
+          Catálogo de Filamentos Ativos ({rolls.length})
         </button>
         <button
+          type="button"
           className={`tab-btn ${activeTab === 'supplies' ? 'active' : ''}`}
           onClick={() => setActiveTab('supplies')}
         >
-          <Wrench size={16} style={{ marginRight: 8 }} />
-          🔧 Insumos Extras & Hardware ({supplies.length})
+          <Wrench size={18} />
+          Insumos Extras & Hardware ({supplies.length})
         </button>
       </div>
 

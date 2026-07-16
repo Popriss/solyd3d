@@ -8,13 +8,16 @@ function VendasContent() {
   const searchParams = useSearchParams();
   const prefillClientId = searchParams.get('clientId');
   const prefillClientName = searchParams.get('clientName');
+  const highlightSaleId = searchParams.get('saleId');
   const prefillHandledRef = useRef(false);
+  const highlightHandledRef = useRef(false);
 
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [salesPoints, setSalesPoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ACTIVE'); // ACTIVE, PAID
+  const [highlightedId, setHighlightedId] = useState(null);
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -43,11 +46,27 @@ function VendasContent() {
         fetch('/api/products'),
         fetch('/api/sales-points'),
       ]);
-      setSales(await sRes.json().then(d => Array.isArray(d) ? d : []));
+      const allSales = await sRes.json().then(d => Array.isArray(d) ? d : []);
+      setSales(allSales);
       const prods = await pRes.json().then(d => Array.isArray(d) ? d : []);
       setProducts(prods);
       const points = await spRes.json().then(d => Array.isArray(d) ? d : []);
       setSalesPoints(points);
+
+      // Se veio parâmetro da URL para destacar um pedido (vindo da Produção)
+      if (highlightSaleId && !highlightHandledRef.current && allSales.length > 0) {
+        highlightHandledRef.current = true;
+        const target = allSales.find(s => s.id === Number(highlightSaleId));
+        if (target) {
+          if (target.status === 'PAID') setActiveTab('PAID');
+          else setActiveTab('ACTIVE');
+          setHighlightedId(target.id);
+          setTimeout(() => {
+            const el = document.getElementById(`sale-card-${target.id}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 200);
+        }
+      }
 
       // Se veio parâmetro da URL para iniciar venda (via CRM Pontos de Venda) apenas uma vez
       if (prefillClientName && !prefillHandledRef.current && prods.length > 0) {
@@ -66,7 +85,7 @@ function VendasContent() {
       }
     } catch { /* empty */ }
     finally { setLoading(false); }
-  }, [prefillClientId, prefillClientName]);
+  }, [prefillClientId, prefillClientName, highlightSaleId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -306,7 +325,32 @@ function VendasContent() {
             const mins = (sale.estimatedPrintMinutes || 0) % 60;
 
             return (
-              <div key={sale.id} className="card" style={{ padding: 20, border: '1px solid var(--border-primary)' }}>
+              <div
+                key={sale.id}
+                id={`sale-card-${sale.id}`}
+                className="card"
+                style={{
+                  padding: 20,
+                  border: sale.id === highlightedId ? '2px solid #818cf8' : '1px solid var(--border-primary)',
+                  boxShadow: sale.id === highlightedId ? '0 0 25px rgba(129, 140, 248, 0.4)' : 'none',
+                  transition: 'all 0.3s ease',
+                  position: 'relative',
+                }}
+              >
+                {sale.id === highlightedId && (
+                  <div style={{
+                    background: 'linear-gradient(90deg, #818cf8, #6366f1)',
+                    color: '#fff',
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    display: 'inline-block',
+                    marginBottom: 12,
+                  }}>
+                    ✨ Pedido Selecionado na Produção
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>

@@ -16,6 +16,7 @@ export async function GET() {
         product: true,
         filamentRoll: true,
         machine: { select: { id: true, name: true, powerWatts: true } },
+        sale: { select: { id: true, customerName: true, status: true } },
       },
     });
     return NextResponse.json(orders);

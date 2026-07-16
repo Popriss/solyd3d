@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Plus, Factory, CheckCircle, XCircle, Clock, PlayCircle,
   X, AlertTriangle, Trash2
@@ -21,6 +22,7 @@ const statusIcons = {
 };
 
 export default function ProducaoPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [rolls, setRolls] = useState([]);
@@ -175,9 +177,34 @@ export default function ProducaoPage() {
                   </td>
                   <td>
                     <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: 4 }}>{order.quantity || 1} unid.</div>
-                    <span className={`badge ${destBadge}`} style={{ fontSize: '0.75rem' }}>
+                    <span className={`badge ${destBadge}`} style={{ fontSize: '0.75rem', display: 'inline-block' }}>
                       📍 {destLabel}
                     </span>
+                    {order.saleId && (
+                      <div style={{ marginTop: 6 }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: '0.75rem',
+                            background: 'rgba(129, 140, 248, 0.15)',
+                            color: '#818cf8',
+                            border: '1px solid rgba(129, 140, 248, 0.35)',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            cursor: 'pointer',
+                            fontWeight: 600
+                          }}
+                          onClick={() => router.push(`/vendas?saleId=${order.saleId}`)}
+                          title="Clique para ver este pedido na aba de Vendas Diretas"
+                        >
+                          🛍️ Venda #{order.saleId}
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td>
                     {order.filamentRoll ? (

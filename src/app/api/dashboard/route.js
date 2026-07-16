@@ -40,9 +40,25 @@ export async function GET() {
       },
     });
 
-    const totalRevenue = settledConsignments.reduce((sum, c) => sum + Number(c.totalSettled || 0), 0);
+    const paidSales = await prisma.sale.findMany({
+      where: {
+        updatedAt: { gte: startOfMonth, lte: endOfMonth },
+        status: 'PAID',
+      },
+      include: { items: true },
+    });
+
+    const totalConsignmentRevenue = settledConsignments.reduce((sum, c) => sum + Number(c.totalSettled || 0), 0);
+    const totalSalesRevenue = paidSales.reduce((sum, s) => sum + Number(s.totalAmount || 0), 0);
+    const totalRevenue = totalConsignmentRevenue + totalSalesRevenue;
+
     const totalCommissionPaid = settledConsignments.reduce((sum, c) => sum + Number(c.totalCommission || 0), 0);
-    const totalProfit = settledConsignments.reduce((sum, c) => sum + Number(c.totalProfit || 0), 0);
+    const totalConsignmentProfit = settledConsignments.reduce((sum, c) => sum + Number(c.totalProfit || 0), 0);
+    // Para Vendas Diretas (PAID), custo dos itens vs preço total
+    const totalSalesCost = paidSales.reduce((sum, s) => {
+      return sum + (s.items?.reduce((itemSum, i) => itemSum + Number(i.unitCost || 0) * Number(i.quantity || 1), 0) || 0);
+    }, 0);
+    const totalProfit = totalConsignmentProfit + (totalSalesRevenue - totalSalesCost);
 
     // 4. Despesas Fixas e Variáveis
     const fixedExpenses = await prisma.fixedExpense.findMany({
@@ -90,6 +106,16 @@ export async function GET() {
         const dKey = new Date(c.settlementDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
         if (dailyMap[dKey]) {
           dailyMap[dKey].revenue += Number(c.totalSettled || 0);
+        }
+      }
+    });
+
+    // Preencher com vendas diretas pagas por data
+    paidSales.forEach(s => {
+      if (s.updatedAt) {
+        const dKey = new Date(s.updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        if (dailyMap[dKey]) {
+          dailyMap[dKey].revenue += Number(s.totalAmount || 0);
         }
       }
     });

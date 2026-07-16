@@ -102,81 +102,237 @@ export default function PontosDeVendaPage() {
           </p>
         </div>
       ) : (
-        <div className="grid-2">
+        <div className="grid-2" style={{ gap: 24 }}>
           {points.map((p) => {
             const typeLabel = POINT_TYPES.find(t => t.value === p.type)?.label || p.type;
             const addressDisplay = p.address || p.location;
             return (
-              <div key={p.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid var(--border-primary)' }}>
+              <div
+                key={p.id}
+                className="card modern-crm-card"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  background: 'linear-gradient(145deg, rgba(26, 34, 52, 0.75) 0%, rgba(15, 23, 42, 0.92) 100%)',
+                  border: '1px solid rgba(129, 140, 248, 0.22)',
+                  borderRadius: '16px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 20px rgba(129, 140, 248, 0.05)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  padding: '24px',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-3px)';
+                  e.currentTarget.style.borderColor = 'rgba(129, 140, 248, 0.45)';
+                  e.currentTarget.style.boxShadow = '0 16px 36px -10px rgba(0, 0, 0, 0.6), 0 0 25px rgba(129, 140, 248, 0.15)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.borderColor = 'rgba(129, 140, 248, 0.22)';
+                  e.currentTarget.style.boxShadow = '0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 20px rgba(129, 140, 248, 0.05)';
+                }}
+              >
+                {/* Linha decorativa no topo do card com gradiente */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: 'linear-gradient(90deg, #818cf8 0%, #22d3ee 50%, #34d399 100%)',
+                }} />
+
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                    <div>
-                      <span className="badge badge-indigo" style={{ marginBottom: 8, display: 'inline-block' }}>{typeLabel}</span>
-                      <h3 className="card-title" style={{ fontSize: '1.3rem', marginBottom: 4 }}>{p.name}</h3>
+                  {/* Cabeçalho do Card */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <div style={{ flex: 1, paddingRight: 12 }}>
+                      <span
+                        style={{
+                          background: 'rgba(129, 140, 248, 0.15)',
+                          color: '#a5b4fc',
+                          border: '1px solid rgba(129, 140, 248, 0.35)',
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                          display: 'inline-block',
+                          marginBottom: 10,
+                        }}
+                      >
+                        {typeLabel}
+                      </span>
+                      <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#ffffff', marginBottom: 6, letterSpacing: '-0.01em', lineHeight: 1.3 }}>
+                        {p.name}
+                      </h3>
                       {addressDisplay && (
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                          <MapPin size={14} style={{ flexShrink: 0 }} /> {addressDisplay}
+                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <MapPin size={14} style={{ color: '#818cf8', flexShrink: 0 }} />
+                          <span>{addressDisplay}</span>
                         </div>
                       )}
                     </div>
-                    <div className="actions-row">
-                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openEdit(p)} title="Editar"><Edit size={14} /></button>
-                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => handleDelete(p.id)} title="Excluir"><Trash2 size={14} /></button>
+                    <div className="actions-row" style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        className="btn btn-ghost btn-sm btn-icon"
+                        style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 8, padding: 6 }}
+                        onClick={() => openEdit(p)}
+                        title="Editar"
+                      >
+                        <Edit size={14} style={{ color: '#cbd5e1' }} />
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm btn-icon"
+                        style={{ background: 'rgba(251, 113, 133, 0.1)', border: '1px solid rgba(251, 113, 133, 0.2)', borderRadius: 8, padding: 6 }}
+                        onClick={() => handleDelete(p.id)}
+                        title="Excluir"
+                      >
+                        <Trash2 size={14} style={{ color: '#fb7185' }} />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Informações de Contato e Financeiras */}
-                  <div style={{ background: 'var(--bg-secondary)', padding: 12, borderRadius: 8, margin: '12px 0', border: '1px solid var(--border-primary)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: '0.85rem' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Contato Responsável *</div>
-                        <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
-                          <User size={14} /> {p.contactName || 'Não informado'}
-                        </div>
+                  {/* Chips de Contato Modernos */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, margin: '18px 0' }}>
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      borderRadius: '12px',
+                      padding: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}>
+                      <div style={{
+                        background: 'rgba(129, 140, 248, 0.15)',
+                        color: '#818cf8',
+                        width: 34,
+                        height: 34,
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        <User size={16} />
                       </div>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Meio de Contato *</div>
-                        <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent-indigo)' }}>
-                          <Phone size={14} /> {p.contactPhone || 'Não informado'}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>Contato *</div>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.contactName || 'Não informado'}
                         </div>
                       </div>
                     </div>
 
-                    {(p.documentId || p.pixKey) && (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: '0.8rem', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-primary)' }}>
-                        {p.documentId && <div><span style={{ color: 'var(--text-muted)' }}>CNPJ/CPF:</span> {p.documentId}</div>}
-                        {p.pixKey && <div><span style={{ color: 'var(--text-muted)' }}>Chave PIX:</span> {p.pixKey}</div>}
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      borderRadius: '12px',
+                      padding: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}>
+                      <div style={{
+                        background: 'rgba(34, 211, 238, 0.15)',
+                        color: '#22d3ee',
+                        width: 34,
+                        height: 34,
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        <Phone size={16} />
                       </div>
-                    )}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>Meio de Contato *</div>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#38bdf8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.contactPhone || 'Não informado'}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Resumo de Consignações e Comissões */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '8px 0', marginBottom: 12 }}>
+                  {(p.documentId || p.pixKey) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: '0.78rem', color: '#94a3b8', background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '8px', marginBottom: 16 }}>
+                      {p.documentId && <div><strong style={{ color: '#cbd5e1' }}>CNPJ/CPF:</strong> {p.documentId}</div>}
+                      {p.pixKey && <div><strong style={{ color: '#cbd5e1' }}>PIX:</strong> {p.pixKey}</div>}
+                    </div>
+                  )}
+
+                  {/* Indicadores KPI do Ponto (Peças e Faturamento) */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 12,
+                    background: 'rgba(15, 23, 42, 0.6)',
+                    border: '1px solid rgba(129, 140, 248, 0.12)',
+                    borderRadius: '14px',
+                    padding: '14px',
+                    marginBottom: 16,
+                  }}>
                     <div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Peças em Consignação</div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 600, color: p.activeItemsCount > 0 ? 'var(--accent-indigo)' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                        <Package size={16} /> {p.activeItemsCount || 0} unid.
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginBottom: 4 }}>Peças em Consignação</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 700, color: p.activeItemsCount > 0 ? '#818cf8' : '#e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Package size={18} style={{ color: '#818cf8' }} />
+                        <span>{p.activeItemsCount || 0} unid.</span>
                       </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Faturamento do Ponto</div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--accent-emerald)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                        <DollarSign size={16} /> {formatCurrency(p.totalRevenue || 0)}
+                    <div style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: 12 }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginBottom: 4 }}>Faturamento do Ponto</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#34d399', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <DollarSign size={18} style={{ color: '#34d399' }} />
+                        <span>{formatCurrency(p.totalRevenue || 0)}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTop: '1px solid var(--border-primary)', gap: 12 }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Comissão: <strong style={{ color: 'var(--text-primary)' }}>{Number(p.commissionPct)}%</strong>
+                {/* Rodapé do Card com Botão Gradiente Premium */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', gap: 12 }}>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    color: '#cbd5e1',
+                    fontWeight: 500,
+                  }}>
+                    Comissão: <strong style={{ color: '#ffffff' }}>{Number(p.commissionPct)}%</strong>
                   </div>
                   <button
-                    className="btn btn-primary btn-sm"
-                    style={{ background: 'var(--accent-indigo)', borderColor: 'var(--accent-indigo)', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
+                    className="btn btn-sm"
+                    style={{
+                      background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+                      border: 'none',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontWeight: 600,
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      boxShadow: '0 4px 15px rgba(99, 102, 241, 0.35)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(99, 102, 241, 0.55)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 15px rgba(99, 102, 241, 0.35)';
+                    }}
                     onClick={() => startNewSale(p)}
                   >
-                    <Rocket size={14} /> Iniciar Nova Venda
+                    <Rocket size={15} />
+                    <span>Iniciar Nova Venda</span>
                   </button>
                 </div>
               </div>

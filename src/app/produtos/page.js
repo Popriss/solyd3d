@@ -7,6 +7,8 @@ const MATERIALS = ['PLA', 'ABS', 'PETG', 'TPU', 'Nylon', 'Resina', 'ASA', 'PC'];
 
 export default function ProdutosPage() {
   const [products, setProducts] = useState([]);
+  const [rolls, setRolls] = useState([]);
+  const [supplies, setSupplies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -24,10 +26,18 @@ export default function ProdutosPage() {
 
   const fetchProducts = useCallback(async () => {
     try {
-      const res = await fetch('/api/products');
+      const [res, rRes, sRes] = await Promise.all([
+        fetch('/api/products'),
+        fetch('/api/filament-rolls'),
+        fetch('/api/supplies'),
+      ]);
       const data = await res.json();
+      const rData = await rRes.json();
+      const sData = await sRes.json();
       setProducts(Array.isArray(data) ? data : []);
-    } catch { setProducts([]); }
+      setRolls(Array.isArray(rData) ? rData : []);
+      setSupplies(Array.isArray(sData) ? sData : []);
+    } catch { setProducts([]); setRolls([]); setSupplies([]); }
     finally { setLoading(false); }
   }, []);
 
@@ -221,8 +231,15 @@ export default function ProdutosPage() {
                 <div style={{ background: 'rgba(56, 189, 248, 0.04)', padding: 12, borderRadius: 8, border: '1px solid rgba(56, 189, 248, 0.15)', marginBottom: 14 }}>
                   <div className="form-row-3" style={{ marginBottom: 10 }}>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontSize: 12 }}>🎨 Cor 1</label>
-                      <input className="form-input" placeholder="Ex: Preto" value={form.color1} onChange={e => handleColorChange({ ...form, color1: e.target.value })} />
+                      <label className="form-label" style={{ fontSize: 12 }}>🎨 Cor 1 (Filamento)</label>
+                      <select className="form-select" value={form.color1} onChange={e => handleColorChange({ ...form, color1: e.target.value })}>
+                        <option value="">Selecione filamento (Ativo ou Não)...</option>
+                        {rolls.map(r => (
+                          <option key={r.id} value={`${r.material} - ${r.color}`}>
+                            {r.material} - {r.color} ({r.brand} - {r.active !== false ? '🟢 Ativo' : '⚪ Inativo'})
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: 12 }}>Peso 1 (g)</label>
@@ -236,7 +253,14 @@ export default function ProdutosPage() {
                   <div className="form-row-3" style={{ marginBottom: 10 }}>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: 12 }}>🎨 Cor 2 (Opcional)</label>
-                      <input className="form-input" placeholder="Ex: Vermelho" value={form.color2} onChange={e => handleColorChange({ ...form, color2: e.target.value })} />
+                      <select className="form-select" value={form.color2} onChange={e => handleColorChange({ ...form, color2: e.target.value })}>
+                        <option value="">Nenhuma ou selecione...</option>
+                        {rolls.map(r => (
+                          <option key={r.id} value={`${r.material} - ${r.color}`}>
+                            {r.material} - {r.color} ({r.brand} - {r.active !== false ? '🟢 Ativo' : '⚪ Inativo'})
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: 12 }}>Peso 2 (g)</label>
@@ -250,7 +274,14 @@ export default function ProdutosPage() {
                   <div className="form-row-3">
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: 12 }}>🎨 Cor 3 (Opcional)</label>
-                      <input className="form-input" placeholder="Ex: Branco" value={form.color3} onChange={e => handleColorChange({ ...form, color3: e.target.value })} />
+                      <select className="form-select" value={form.color3} onChange={e => handleColorChange({ ...form, color3: e.target.value })}>
+                        <option value="">Nenhuma ou selecione...</option>
+                        {rolls.map(r => (
+                          <option key={r.id} value={`${r.material} - ${r.color}`}>
+                            {r.material} - {r.color} ({r.brand} - {r.active !== false ? '🟢 Ativo' : '⚪ Inativo'})
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: 12 }}>Peso 3 (g)</label>
@@ -281,7 +312,14 @@ export default function ProdutosPage() {
                   <div className="form-row" style={{ marginBottom: 10 }}>
                     <div className="form-group" style={{ flex: 2 }}>
                       <label className="form-label" style={{ fontSize: 12 }}>Item Extra 1</label>
-                      <input className="form-input" placeholder="Ex: Argola Chaveiro" value={form.extra1Name} onChange={e => setForm({ ...form, extra1Name: e.target.value })} />
+                      <select className="form-select" value={form.extra1Name} onChange={e => setForm({ ...form, extra1Name: e.target.value })}>
+                        <option value="">Nenhum ou selecione insumo...</option>
+                        {supplies.map(s => (
+                          <option key={s.id} value={s.name}>
+                            {s.name} ({formatCurrency(s.unitCost)} / un)
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: 12 }}>Quantidade 1</label>
@@ -291,7 +329,14 @@ export default function ProdutosPage() {
                   <div className="form-row">
                     <div className="form-group" style={{ flex: 2 }}>
                       <label className="form-label" style={{ fontSize: 12 }}>Item Extra 2 (Opcional)</label>
-                      <input className="form-input" placeholder="Ex: Embalagem Plástica" value={form.extra2Name} onChange={e => setForm({ ...form, extra2Name: e.target.value })} />
+                      <select className="form-select" value={form.extra2Name} onChange={e => setForm({ ...form, extra2Name: e.target.value })}>
+                        <option value="">Nenhum ou selecione insumo...</option>
+                        {supplies.map(s => (
+                          <option key={s.id} value={s.name}>
+                            {s.name} ({formatCurrency(s.unitCost)} / un)
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: 12 }}>Quantidade 2</label>

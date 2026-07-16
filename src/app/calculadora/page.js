@@ -44,7 +44,7 @@ export default function CalculadoraPage() {
     try {
       const [pRes, rRes, sRes, mRes, eRes] = await Promise.all([
         fetch('/api/products'),
-        fetch('/api/filament-rolls?activeOnly=true'),
+        fetch('/api/filament-rolls'),
         fetch('/api/supplies'),
         fetch('/api/machines'),
         fetch('/api/energy-config'),
@@ -62,7 +62,7 @@ export default function CalculadoraPage() {
 
       setProducts(pArr);
       setRolls(rArr);
-      setSupplies(sArr.filter(item => item.active !== false));
+      setSupplies(sArr);
       setMachines(mArr);
       if (Array.isArray(eData) && eData[0]) setKwhPrice(Number(eData[0].kwhPrice));
 
@@ -91,29 +91,39 @@ export default function CalculadoraPage() {
 
     const defaultRollId = rolls[0]?.id || '';
 
+    const matchRoll = (colorVal) => {
+      if (!colorVal) return '';
+      const found = rolls.find(r =>
+        `${r.material} - ${r.color}` === colorVal ||
+        r.color.toLowerCase() === colorVal.toLowerCase() ||
+        colorVal.toLowerCase().includes(r.color.toLowerCase())
+      );
+      return found ? found.id : '';
+    };
+
     // Cores
     const newColors = [
       {
         name: prod.color1 || (prod.recommendedColor || 'Cor Principal'),
         weight: Number(prod.weight1G) || Number(prod.estimatedWeightG) || 0,
-        rollId: defaultRollId,
+        rollId: matchRoll(prod.color1) || defaultRollId,
       },
       {
         name: prod.color2 || 'Cor 2',
         weight: Number(prod.weight2G) || 0,
-        rollId: prod.weight2G ? defaultRollId : '',
+        rollId: prod.weight2G ? (matchRoll(prod.color2) || defaultRollId) : '',
       },
       {
         name: prod.color3 || 'Cor 3',
         weight: Number(prod.weight3G) || 0,
-        rollId: prod.weight3G ? defaultRollId : '',
+        rollId: prod.weight3G ? (matchRoll(prod.color3) || defaultRollId) : '',
       },
     ];
     setColors(newColors);
 
     // Extras
-    const matchSupply1 = supplies.find(s => s.name.toLowerCase().includes((prod.extra1Name || '').toLowerCase()));
-    const matchSupply2 = supplies.find(s => s.name.toLowerCase().includes((prod.extra2Name || '').toLowerCase()));
+    const matchSupply1 = supplies.find(s => s.name.toLowerCase() === (prod.extra1Name || '').toLowerCase() || s.name.toLowerCase().includes((prod.extra1Name || '').toLowerCase()));
+    const matchSupply2 = supplies.find(s => s.name.toLowerCase() === (prod.extra2Name || '').toLowerCase() || s.name.toLowerCase().includes((prod.extra2Name || '').toLowerCase()));
     setExtras([
       { name: prod.extra1Name || '', qty: Number(prod.extra1Qty) || 0, supplyId: matchSupply1?.id || '' },
       { name: prod.extra2Name || '', qty: Number(prod.extra2Qty) || 0, supplyId: matchSupply2?.id || '' },

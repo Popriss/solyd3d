@@ -84,9 +84,11 @@ export function formatPercent(value) {
  */
 export const orderStatusLabels = {
   QUEUED: 'Na Fila',
+  SLICED: 'Fatiado',
   PRINTING: 'Imprimindo',
-  COMPLETED: 'Finalizado',
-  FAILED: 'Falha',
+  POST_PROCESSING: 'Pós-Processamento',
+  COMPLETED: 'Concluído',
+  FAILED: 'Falha / Scrap',
 };
 
 /**

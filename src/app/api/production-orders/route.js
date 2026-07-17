@@ -3,20 +3,29 @@ import prisma from '@/lib/prisma';
 import {
   calculateMaterialCost,
   calculateEnergyCost,
-  calculateTotalCost
+  calculateTotalCost,
+  determineFilamentStatus,
 } from '@/lib/calculations';
 import { logAction } from '@/lib/activityLogger';
 
-// GET - Listar ordens de produção
+// GET - Listar ordens de produção com as tarefas de chapa (PrintTasks)
 export async function GET() {
   try {
     const orders = await prisma.productionOrder.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        product: true,
+        product: { include: { plates: true } },
         filamentRoll: true,
         machine: { select: { id: true, name: true, powerWatts: true } },
         sale: { select: { id: true, customerName: true, status: true } },
+        printTasks: {
+          orderBy: { id: 'asc' },
+          include: {
+            productPlate: true,
+            filamentRoll: true,
+            machine: { select: { id: true, name: true, powerWatts: true } },
+          },
+        },
       },
     });
     return NextResponse.json(orders);
@@ -26,89 +35,173 @@ export async function GET() {
   }
 }
 
-// POST - Criar ordem de produção (e Gatilho Reverso de Venda se for Avulsa ou Encomenda)
+// POST - Criar ordem de produção (com transação gerando PrintTasks por chapa no BOM)
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { productId, filamentRollId, machineId, notes, quantity, destinationType, destinationName, saleId, saleItemId } = body;
+    const {
+      productId,
+      filamentRollId,
+      machineId,
+      notes,
+      quantity,
+      destinationType,
+      destinationName,
+      saleId,
+      saleItemId,
+      plateOverrides, // Opcional: Array de [{ productPlateId: 1, targetCycles: 15 }]
+    } = body;
 
-    if (!productId || !filamentRollId || !machineId) {
-      return NextResponse.json({ error: 'Campos obrigatórios faltando' }, { status: 400 });
+    if (!productId) {
+      return NextResponse.json({ error: 'ID do produto é obrigatório' }, { status: 400 });
     }
 
     const qty = Number(quantity) || 1;
-    const product = await prisma.product.findUnique({ where: { id: Number(productId) } });
-    const roll = await prisma.filamentRoll.findUnique({ where: { id: Number(filamentRollId) } });
 
-    let linkedSaleId = saleId ? Number(saleId) : null;
-    let linkedSaleItemId = saleItemId ? Number(saleItemId) : null;
-
-    // GATILHO REVERSO: Se for Venda Avulsa ou Encomenda e ainda não tiver Venda atrelada, criar uma Venda em /vendas automaticamente!
-    if (!linkedSaleId && (destinationType === 'DIRECT_SALE' || destinationType === 'ORDER') && destinationName && product) {
-      const unitPrice = Number(product.salePrice || 25.0);
-      const totalPrice = unitPrice * qty;
-      const estimatedMinutes = (Number(product.estimatedPrintMinutes) || 60) * qty;
-      const costPerGram = roll ? Number(roll.costPerRoll || 150) / Number(roll.initialWeightG || 1000) : 0.15;
-      const unitCost = Number(product.estimatedWeightG || 50) * costPerGram + 3.0;
-
-      const reverseSale = await prisma.sale.create({
-        data: {
-          customerName: destinationName,
-          status: 'ACTIVE',
-          totalAmount: totalPrice,
-          estimatedPrintMinutes: estimatedMinutes,
-          notes: `[Gatilho Reverso OP] Criada via Ordem de Produção manual — ${qty}x ${product.name}`,
-          items: {
-            create: {
-              productId: product.id,
-              quantity: qty,
-              unitPrice,
-              unitCost,
-              totalPrice,
-              estimatedMinutes,
-            },
-          },
-        },
-        include: { items: true },
+    // Executa transação garantindo atomicidade na criação da OP Pai + Chapas Filhas (PrintTasks)
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({
+        where: { id: Number(productId) },
+        include: { plates: true },
       });
 
-      linkedSaleId = reverseSale.id;
-      if (reverseSale.items[0]) {
-        linkedSaleItemId = reverseSale.items[0].id;
+      if (!product) {
+        throw new Error('Produto não encontrado');
       }
-    }
 
-    const order = await prisma.productionOrder.create({
-      data: {
-        productId: Number(productId),
-        filamentRollId: Number(filamentRollId),
-        machineId: Number(machineId),
-        status: 'QUEUED',
-        quantity: qty,
-        destinationType: destinationType || null,
-        destinationName: destinationName || null,
-        saleId: linkedSaleId,
-        saleItemId: linkedSaleItemId,
-        notes: notes || null,
-      },
-      include: {
-        product: true,
-        filamentRoll: true,
-        machine: true,
-        sale: true,
-      },
+      const roll = filamentRollId ? await tx.filamentRoll.findUnique({ where: { id: Number(filamentRollId) } }) : null;
+
+      let linkedSaleId = saleId ? Number(saleId) : null;
+      let linkedSaleItemId = saleItemId ? Number(saleItemId) : null;
+
+      // GATILHO REVERSO: Se for Venda Avulsa ou Encomenda e não tiver Venda vinculada, cria em /vendas!
+      if (!linkedSaleId && (destinationType === 'DIRECT_SALE' || destinationType === 'ORDER') && destinationName) {
+        const unitPrice = Number(product.salePrice || 25.0);
+        const totalPrice = unitPrice * qty;
+        
+        const totalWeight = product.plates.length > 0 
+          ? product.plates.reduce((acc, p) => acc + Number(p.estimatedWeightG), 0)
+          : Number(product.estimatedWeightG || 50);
+        const totalMinutes = product.plates.length > 0 
+          ? product.plates.reduce((acc, p) => acc + Number(p.estimatedPrintMinutes), 0) * qty
+          : Number(product.estimatedPrintMinutes || 60) * qty;
+
+        const costPerGram = roll ? Number(roll.costPerRoll || 150) / Number(roll.initialWeightG || 1000) : 0.15;
+        const unitCost = totalWeight * costPerGram + 3.0;
+
+        const reverseSale = await tx.sale.create({
+          data: {
+            customerName: destinationName,
+            status: 'ACTIVE',
+            totalAmount: totalPrice,
+            estimatedPrintMinutes: totalMinutes,
+            notes: `[Gatilho Reverso OP BOM] Criada via Ordem de Produção manual — ${qty}x ${product.name}`,
+            items: {
+              create: {
+                productId: product.id,
+                quantity: qty,
+                unitPrice,
+                unitCost,
+                totalPrice,
+                estimatedMinutes: totalMinutes,
+              },
+            },
+          },
+          include: { items: true },
+        });
+
+        linkedSaleId = reverseSale.id;
+        if (reverseSale.items[0]) {
+          linkedSaleItemId = reverseSale.items[0].id;
+        }
+      }
+
+      // 1. Cria a Ordem de Produção Pai (Lote)
+      const order = await tx.productionOrder.create({
+        data: {
+          productId: Number(productId),
+          filamentRollId: filamentRollId ? Number(filamentRollId) : null,
+          machineId: machineId ? Number(machineId) : null,
+          status: 'QUEUED',
+          targetQuantity: qty,
+          quantity: qty, // Retrocompatibilidade
+          destinationType: destinationType || null,
+          destinationName: destinationName || null,
+          saleId: linkedSaleId,
+          saleItemId: linkedSaleItemId,
+          notes: notes || null,
+        },
+      });
+
+      // 2. Criação Iterativa das PrintTasks (Chapas no Kanban com multiplicador de ciclo)
+      let platesToProcess = product.plates;
+
+      // Fallback para Produto Legado (sem chapa cadastrada no BOM ainda)
+      if (platesToProcess.length === 0) {
+        const fallbackPlate = await tx.productPlate.create({
+          data: {
+            productId: product.id,
+            name: `${product.name} (Chapa Principal)`,
+            estimatedWeightG: Number(product.estimatedWeightG || 50),
+            estimatedPrintMinutes: Number(product.estimatedPrintMinutes || 60),
+            materialColorNeeded: product.recommendedColor || roll?.color || 'Padrão',
+            yieldPerCycle: 1,
+          },
+        });
+        platesToProcess = [fallbackPlate];
+      }
+
+      for (const plate of platesToProcess) {
+        const yieldQty = Math.max(1, Number(plate.yieldPerCycle || 1));
+        const defaultCycles = Math.ceil(qty / yieldQty);
+
+        // Verifica se houve override personalizado de ciclos para esta placa
+        const override = Array.isArray(plateOverrides)
+          ? plateOverrides.find((o) => Number(o.productPlateId) === plate.id)
+          : null;
+        const targetCycles = override && override.targetCycles !== undefined
+          ? Math.max(1, Number(override.targetCycles))
+          : defaultCycles;
+
+        await tx.printTask.create({
+          data: {
+            productionOrderId: order.id,
+            productPlateId: plate.id,
+            filamentRollId: filamentRollId ? Number(filamentRollId) : null,
+            machineId: machineId ? Number(machineId) : null,
+            status: 'QUEUED',
+            targetCycles,
+            completedCycles: 0,
+          },
+        });
+      }
+
+      return tx.productionOrder.findUnique({
+        where: { id: order.id },
+        include: {
+          product: true,
+          printTasks: { include: { productPlate: true, filamentRoll: true, machine: true } },
+          filamentRoll: true,
+          machine: true,
+          sale: true,
+        },
+      });
     });
 
-    await logAction({ actionType: 'CRIAR', module: 'PRODUCAO', description: `Criou ordem de produção #${order.id} (${qty}x ${order.product?.name || 'Peça 3D'})${destinationName ? ' para ' + destinationName : ''}` });
+    await logAction({
+      actionType: 'CRIAR',
+      module: 'PRODUCAO',
+      description: `Criou Lote BOM #${result.id} (${qty}x ${result.product.name}) com ${result.printTasks.length} tarefas de chapa.`,
+    });
 
-    return NextResponse.json(order, { status: 201 });
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error('POST /api/production-orders error:', error);
-    return NextResponse.json({ error: 'Erro ao criar ordem' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Erro ao criar ordem de produção' }, { status: 500 });
   }
 }
 
-// PUT - Atualizar status da ordem (Custeio Qualitativo sem baixa no estoque de filamento)
+// PUT - Atualizar status da ordem (com lógica condicional de Estoque Granular)
 export async function PUT(request) {
   try {
     const body = await request.json();
@@ -128,6 +221,12 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Ordem não encontrada' }, { status: 404 });
     }
 
+    // Buscar configuração do modo de estoque granular
+    const granularConfig = await prisma.systemConfig.findUnique({
+      where: { key: 'modo_estoque_granular' },
+    });
+    const isGranular = granularConfig?.value === 'true';
+
     const updateData = {};
 
     // Atualizar status
@@ -138,14 +237,14 @@ export async function PUT(request) {
         updateData.startedAt = new Date();
       }
 
-      // Ao finalizar ou falhar: calcular custos puramente com base no custo por grama do filamento ativo
-      // REGRA DE OURO: Nenhuma quantidade em gramas é subtraída do banco de dados (baixa abolida)
+      // Ao finalizar ou falhar: calcular custos e opcionalmente subtrair estoque
       if (status === 'COMPLETED' || status === 'FAILED') {
         updateData.finishedAt = new Date();
         updateData.isFailure = status === 'FAILED';
 
         const weightUsed = Number(actualWeightG || existingOrder.product.estimatedWeightG);
         const printMins = Number(actualPrintMinutes || existingOrder.product.estimatedPrintMinutes);
+        const qty = existingOrder.quantity || 1;
 
         // Buscar config de energia mais recente
         const energyConfig = await prisma.energyConfig.findFirst({
@@ -154,8 +253,8 @@ export async function PUT(request) {
         const kwhPrice = energyConfig ? Number(energyConfig.kwhPrice) : 0.85;
 
         const costPerGram = existingOrder.filamentRoll ? Number(existingOrder.filamentRoll.costPerGram) : 0.12;
-        const matCost = calculateMaterialCost(weightUsed, costPerGram);
-        const enCost = calculateEnergyCost(Number(existingOrder.machine.powerWatts), printMins, kwhPrice);
+        const matCost = calculateMaterialCost(weightUsed * qty, costPerGram);
+        const enCost = calculateEnergyCost(Number(existingOrder.machine.powerWatts), printMins * qty, kwhPrice);
 
         updateData.actualWeightG = weightUsed;
         updateData.actualPrintMinutes = printMins;
@@ -163,11 +262,35 @@ export async function PUT(request) {
         updateData.energyCost = enCost;
         updateData.totalCost = calculateTotalCost(matCost, enCost);
 
+        // ============================================================
+        // CHAVE DE ESTOQUE GRANULAR — Lógica condicional
+        // ============================================================
+        if (isGranular && existingOrder.filamentRoll) {
+          // Modo Granular LIGADO: subtrair peso do rolo de filamento
+          const totalWeightToSubtract = weightUsed * qty;
+          const currentRemaining = Number(
+            existingOrder.filamentRoll.remainingWeightG
+            ?? existingOrder.filamentRoll.initialWeightG
+          );
+          const newRemaining = Math.max(0, currentRemaining - totalWeightToSubtract);
+
+          await prisma.filamentRoll.update({
+            where: { id: existingOrder.filamentRollId },
+            data: {
+              remainingWeightG: newRemaining,
+              status: determineFilamentStatus(newRemaining),
+              // Se zerou, desativar automaticamente
+              active: newRemaining > 0,
+            },
+          });
+        }
+        // Se !isGranular: Modo Simplificado — NÃO toca no estoque (comportamento original)
+
         // Se finalizou com sucesso (COMPLETED), entra no Estoque Pronto do produto
         if (status === 'COMPLETED' && existingOrder.status !== 'COMPLETED') {
           await prisma.product.update({
             where: { id: existingOrder.productId },
-            data: { stockReady: { increment: 1 } },
+            data: { stockReady: { increment: existingOrder.quantity || 1 } },
           });
         }
       }
@@ -187,7 +310,19 @@ export async function PUT(request) {
       },
     });
 
-    await logAction({ actionType: status === 'COMPLETED' ? 'CONCLUIR' : 'ATUALIZAR', module: 'PRODUCAO', description: `Atualizou ordem de produção #${updatedOrder.id} (${updatedOrder.product?.name || 'Peça'}) para status ${updatedOrder.status}` });
+    const statusLabels = {
+      QUEUED: 'Na Fila', SLICED: 'Fatiado', PRINTING: 'Imprimindo',
+      POST_PROCESSING: 'Pós-Processamento', COMPLETED: 'Concluído', FAILED: 'Falha/Scrap',
+    };
+    const granularNote = (status === 'COMPLETED' || status === 'FAILED') && isGranular
+      ? ' [Estoque Granular: baixa de gramas aplicada]'
+      : '';
+
+    await logAction({
+      actionType: status === 'COMPLETED' ? 'CONCLUIR' : 'ATUALIZAR',
+      module: 'PRODUCAO',
+      description: `Moveu OP #${updatedOrder.id} (${updatedOrder.product?.name || 'Peça'}) → ${statusLabels[updatedOrder.status] || updatedOrder.status}${granularNote}`,
+    });
 
     return NextResponse.json(updatedOrder);
   } catch (error) {

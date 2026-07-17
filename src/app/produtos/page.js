@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Package, ExternalLink, Trash2, Edit, X, Palette, Wrench, DollarSign } from 'lucide-react';
+import { Plus, Package, ExternalLink, Trash2, Edit, X, Palette, Wrench, Layers } from 'lucide-react';
 import { formatCurrency, formatWeight, formatDuration, formatPercent } from '@/lib/formatters';
 
 const MATERIALS = ['PLA', 'ABS', 'PETG', 'TPU', 'Nylon', 'Resina', 'ASA', 'PC'];
@@ -22,6 +22,7 @@ export default function ProdutosPage() {
     color3: '', weight3G: '', time3Min: '',
     extra1Name: '', extra1Qty: '',
     extra2Name: '', extra2Qty: '',
+    plates: [], // Array de chapas [{ name, estimatedWeightG, estimatedPrintMinutes, materialColorNeeded, yieldPerCycle }]
   });
 
   const fetchProducts = useCallback(async () => {
@@ -54,6 +55,7 @@ export default function ProdutosPage() {
       color3: '', weight3G: '', time3Min: '',
       extra1Name: '', extra1Qty: '',
       extra2Name: '', extra2Qty: '',
+      plates: [],
     });
     setShowModal(true);
   };
@@ -76,8 +78,44 @@ export default function ProdutosPage() {
       color3: p.color3 || '', weight3G: p.weight3G || '', time3Min: p.time3Min || '',
       extra1Name: p.extra1Name || '', extra1Qty: p.extra1Qty || '',
       extra2Name: p.extra2Name || '', extra2Qty: p.extra2Qty || '',
+      plates: Array.isArray(p.plates) ? p.plates.map(pl => ({
+        name: pl.name || '',
+        estimatedWeightG: pl.estimatedWeightG || '',
+        estimatedPrintMinutes: pl.estimatedPrintMinutes || '',
+        materialColorNeeded: pl.materialColorNeeded || '',
+        yieldPerCycle: pl.yieldPerCycle || 1,
+      })) : [],
     });
     setShowModal(true);
+  };
+
+  // Funções de manipulação do BOM Multi-Chapas
+  const addPlate = () => {
+    const nextPlates = [
+      ...form.plates,
+      { name: `Chapa ${form.plates.length + 1}`, estimatedWeightG: '50', estimatedPrintMinutes: '60', materialColorNeeded: 'PLA', yieldPerCycle: 1 },
+    ];
+    updatePlatesAndTotals(nextPlates);
+  };
+
+  const removePlate = (index) => {
+    const nextPlates = form.plates.filter((_, i) => i !== index);
+    updatePlatesAndTotals(nextPlates);
+  };
+
+  const updatePlateField = (index, field, value) => {
+    const nextPlates = form.plates.map((pl, i) => i === index ? { ...pl, [field]: value } : pl);
+    updatePlatesAndTotals(nextPlates);
+  };
+
+  const updatePlatesAndTotals = (nextPlates) => {
+    if (nextPlates.length > 0) {
+      const totalW = nextPlates.reduce((sum, pl) => sum + (Number(pl.estimatedWeightG) || 0), 0);
+      const totalT = nextPlates.reduce((sum, pl) => sum + (Number(pl.estimatedPrintMinutes) || 0), 0);
+      setForm({ ...form, plates: nextPlates, estimatedWeightG: totalW, estimatedPrintMinutes: totalT });
+    } else {
+      setForm({ ...form, plates: nextPlates });
+    }
   };
 
   // Calcular peso e tempo automáticos se o usuário preencher as cores separadas
@@ -127,8 +165,9 @@ export default function ProdutosPage() {
           <thead>
             <tr>
               <th>Nome do Modelo</th>
+              <th>Chapas (BOM .Gcode)</th>
               <th>Cores / Plástico (g)</th>
-              <th>Duração</th>
+              <th>Duração Total</th>
               <th>Hardware / Extras</th>
               <th>Preço de Venda</th>
               <th>Link</th>
@@ -137,16 +176,35 @@ export default function ProdutosPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="7" style={{ textAlign: 'center', padding: 40 }}><div className="spinner" style={{ margin: '0 auto' }}></div></td></tr>
+              <tr><td colSpan="8" style={{ textAlign: 'center', padding: 40 }}><div className="spinner" style={{ margin: '0 auto' }}></div></td></tr>
             ) : products.length === 0 ? (
-              <tr><td colSpan="7"><div className="empty-state"><Package /><div className="empty-state-title">Nenhum modelo cadastrado</div></div></td></tr>
+              <tr><td colSpan="8"><div className="empty-state"><Package /><div className="empty-state-title">Nenhum modelo cadastrado</div></div></td></tr>
             ) : products.map(p => {
               const hasColors = p.color1 || p.color2 || p.color3;
+              const hasPlates = p.plates && p.plates.length > 0;
               return (
                 <tr key={p.id}>
                   <td>
                     <strong>{p.name}</strong>
                     {p.recommendedMaterial && <div style={{ fontSize: 12, color: '#818cf8', marginTop: 2 }}>Material sugerido: {p.recommendedMaterial}</div>}
+                  </td>
+                  <td>
+                    {hasPlates ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span className="badge badge-purple" style={{ alignSelf: 'flex-start', fontSize: 11 }}>
+                          🗂️ {p.plates.length} {p.plates.length === 1 ? 'Chapa' : 'Chapas'}
+                        </span>
+                        <div style={{ fontSize: 11, color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {p.plates.map((pl, i) => (
+                            <div key={i}>
+                              • <strong>{pl.name}</strong> ({formatWeight(pl.estimatedWeightG)}, {formatDuration(pl.estimatedPrintMinutes)}) {pl.yieldPerCycle > 1 ? `[Rende ${pl.yieldPerCycle} un]` : ''}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="badge badge-slate" style={{ fontSize: 11 }}>Chapa Única</span>
+                    )}
                   </td>
                   <td>
                     {hasColors ? (
@@ -223,6 +281,56 @@ export default function ProdutosPage() {
                     <label className="form-label">Consumo Específico (W) [Opcional]</label>
                     <input className="form-input" type="number" placeholder="Padrão da máquina se vazio" value={form.powerWatts} onChange={e => setForm({ ...form, powerWatts: e.target.value })} />
                   </div>
+                </div>
+
+                {/* ========================================================= */}
+                {/* BOM MULTI-CHAPAS (ProductPlate) */}
+                {/* ========================================================= */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 6, margin: '24px 0 14px' }}>
+                  <h3 style={{ fontSize: 14, color: '#a855f7', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+                    <Layers size={16} /> Chapas de Impressão (.Gcodes) — BOM
+                  </h3>
+                  <button type="button" className="btn btn-sm" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#d8b4fe', border: '1px solid rgba(168, 85, 247, 0.3)' }} onClick={addPlate}>
+                    <Plus size={14} /> Adicionar Chapa
+                  </button>
+                </div>
+
+                <div style={{ background: 'rgba(168, 85, 247, 0.03)', padding: 12, borderRadius: 8, border: '1px solid rgba(168, 85, 247, 0.15)', marginBottom: 18 }}>
+                  {form.plates.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 16, color: '#94a3b8', fontSize: 13 }}>
+                      Nenhuma chapa cadastrada. Se deixar vazio, o sistema assumirá <strong>Chapa Única</strong> usando os pesos globais abaixo.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {form.plates.map((pl, idx) => (
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1fr auto', gap: 8, alignItems: 'end', background: 'rgba(255,255,255,0.02)', padding: 10, borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label" style={{ fontSize: 11 }}>Nome da Chapa</label>
+                            <input className="form-input" style={{ fontSize: 12, padding: '6px 8px' }} placeholder="Ex: Corpo" value={pl.name} onChange={e => updatePlateField(idx, 'name', e.target.value)} required />
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label" style={{ fontSize: 11 }}>Peso (g)</label>
+                            <input className="form-input" style={{ fontSize: 12, padding: '6px 8px' }} type="number" step="0.01" placeholder="100" value={pl.estimatedWeightG} onChange={e => updatePlateField(idx, 'estimatedWeightG', e.target.value)} required />
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label" style={{ fontSize: 11 }}>Tempo (min)</label>
+                            <input className="form-input" style={{ fontSize: 12, padding: '6px 8px' }} type="number" placeholder="180" value={pl.estimatedPrintMinutes} onChange={e => updatePlateField(idx, 'estimatedPrintMinutes', e.target.value)} required />
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label" style={{ fontSize: 11 }}>Cor / Material</label>
+                            <input className="form-input" style={{ fontSize: 12, padding: '6px 8px' }} placeholder="Ex: PLA Preto" value={pl.materialColorNeeded} onChange={e => updatePlateField(idx, 'materialColorNeeded', e.target.value)} />
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label" style={{ fontSize: 11 }} title="Quantas peças esta chapa rende por rodada">Rendimento / Rodada</label>
+                            <input className="form-input" style={{ fontSize: 12, padding: '6px 8px' }} type="number" min="1" placeholder="1" value={pl.yieldPerCycle} onChange={e => updatePlateField(idx, 'yieldPerCycle', e.target.value)} required />
+                          </div>
+                          <button type="button" className="btn btn-ghost btn-sm btn-icon" style={{ color: '#f87171', marginBottom: 2 }} onClick={() => removePlate(idx)} title="Remover chapa">
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <h3 style={{ fontSize: 14, color: '#38bdf8', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 6, margin: '20px 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>

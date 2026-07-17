@@ -1,12 +1,14 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Settings, Printer, Zap, Plus, Trash2, X } from 'lucide-react';
+import { Settings, Printer, Zap, Plus, Trash2, X, Database, ToggleRight, ToggleLeft } from 'lucide-react';
 import { formatCurrency, formatDate, machineStatusLabels } from '@/lib/formatters';
 
 export default function ConfiguracoesPage() {
   const [machines, setMachines] = useState([]);
   const [energyConfigs, setEnergyConfigs] = useState([]);
+  const [granularMode, setGranularMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
   const [showMachineModal, setShowMachineModal] = useState(false);
   const [showEnergyModal, setShowEnergyModal] = useState(false);
   const [machineForm, setMachineForm] = useState({ name: '', purchasePrice: '', installmentCount: '12', installmentValue: '', powerWatts: '', purchaseDate: '' });
@@ -14,14 +16,34 @@ export default function ConfiguracoesPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [mRes, eRes] = await Promise.all([fetch('/api/machines'), fetch('/api/energy-config')]);
+      const [mRes, eRes, cfgRes] = await Promise.all([
+        fetch('/api/machines'),
+        fetch('/api/energy-config'),
+        fetch('/api/system-config'),
+      ]);
       setMachines(await mRes.json().then(d => Array.isArray(d) ? d : []));
       setEnergyConfigs(await eRes.json().then(d => Array.isArray(d) ? d : []));
+      const config = await cfgRes.json();
+      setGranularMode(config?.modo_estoque_granular?.value === 'true');
     } catch { /* empty */ }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleToggleGranular = async () => {
+    setToggling(true);
+    const newValue = !granularMode;
+    try {
+      await fetch('/api/system-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'modo_estoque_granular', value: String(newValue) }),
+      });
+      setGranularMode(newValue);
+    } catch { /* rollback */ }
+    finally { setToggling(false); }
+  };
 
   const handleMachineSubmit = async (e) => {
     e.preventDefault();
@@ -46,7 +68,61 @@ export default function ConfiguracoesPage() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <div><h1 className="page-title">Configurações</h1><p className="page-subtitle">Máquinas e configuração de energia</p></div>
+        <div><h1 className="page-title">Configurações</h1><p className="page-subtitle">Máquinas, energia e regras de estoque</p></div>
+      </div>
+
+      {/* ============================================ */}
+      {/* CHAVE DE ESTOQUE GRANULAR — Liga / Desliga */}
+      {/* ============================================ */}
+      <div style={{ marginBottom: 28 }}>
+        <div className="config-toggle-card" style={{ opacity: toggling ? 0.6 : 1 }}>
+          <div style={{
+            width: 50, height: 50, borderRadius: 12,
+            background: granularMode ? 'rgba(52, 211, 153, 0.15)' : 'rgba(107, 114, 128, 0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: granularMode ? '#34d399' : '#6b7280',
+            transition: 'all 0.3s ease',
+            flexShrink: 0,
+          }}>
+            <Database size={24} />
+          </div>
+          <div className="config-toggle-info">
+            <div className="config-toggle-title">
+              ⚙️ Chave de Estoque Granular
+            </div>
+            <div className="config-toggle-desc">
+              {granularMode ? (
+                <>
+                  <strong style={{ color: '#34d399' }}>LIGADO — Controle por Gramas:</strong> O sistema exige o peso
+                  inicial de cada rolo de filamento. Ao concluir ou falhar uma OP, o peso da peça é subtraído automaticamente
+                  do saldo em gramas do rolo. Ideal para controle rigoroso de material e custos.
+                </>
+              ) : (
+                <>
+                  <strong style={{ color: '#9ca3af' }}>DESLIGADO — Estoque Simplificado:</strong> O sistema ignora as
+                  quantidades em gramas. Você apenas marca se uma cor/material está &quot;Ativa&quot; ou &quot;Inativa&quot;.
+                  Nenhuma subtração ocorre ao finalizar uma impressão. O cálculo de custo continua funcionando normalmente.
+                </>
+              )}
+            </div>
+            <div className={`config-toggle-status ${granularMode ? 'active' : 'inactive'}`}>
+              {granularMode ? (
+                <><ToggleRight size={14} /> Granular — Subtrai Gramas Automaticamente</>
+              ) : (
+                <><ToggleLeft size={14} /> Simplificado — Apenas Ativo / Inativo</>
+              )}
+            </div>
+          </div>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={granularMode}
+              onChange={handleToggleGranular}
+              disabled={toggling}
+            />
+            <span className="toggle-slider"></span>
+          </label>
+        </div>
       </div>
 
       <div className="grid-2">

@@ -11,6 +11,20 @@ datasource db {
 }
 
 // ============================================
+// CONFIGURAÇÕES GLOBAIS DO SISTEMA
+// ============================================
+
+model SystemConfig {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  label     String?  // Descrição legível da configuração
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_configs")
+}
+
+// ============================================
 // AUTENTICAÇÃO
 // ============================================
 
@@ -50,6 +64,7 @@ model Machine {
 
   productionOrders ProductionOrder[]
   fixedExpenses    FixedExpense[]
+  printTasks       PrintTask[]
 
   @@map("machines")
 }
@@ -86,6 +101,7 @@ model FilamentRoll {
   initialWeightG   Decimal   @map("initial_weight_g") @db.Decimal(10, 2)
   costPerRoll      Decimal   @map("cost_per_roll") @db.Decimal(10, 2)
   costPerGram      Decimal   @map("cost_per_gram") @db.Decimal(10, 4)
+  remainingWeightG Decimal?  @map("remaining_weight_g") @db.Decimal(10, 2)
   active           Boolean   @default(true) @map("is_active")
   status           FilamentStatus? @default(AVAILABLE)
   createdAt        DateTime  @default(now()) @map("created_at")
@@ -93,6 +109,7 @@ model FilamentRoll {
 
   productionOrders ProductionOrder[]
   variableExpenses VariableExpense[]
+  printTasks       PrintTask[]
 
   @@map("filament_rolls")
 }
@@ -126,19 +143,19 @@ model SupplyItem {
 // ============================================
 
 model Product {
-  id                   Int      @id @default(autoincrement())
-  name                 String
-  description          String?  @db.Text
-  projectLink          String?  @map("project_link")
-  estimatedWeightG     Decimal  @map("estimated_weight_g") @db.Decimal(10, 2)
-  estimatedPrintMinutes Int     @map("estimated_print_minutes")
-  recommendedMaterial  String?  @map("recommended_material")
-  recommendedColor     String?  @map("recommended_color")
-  profitMarginPct      Decimal  @default(50) @map("profit_margin_pct") @db.Decimal(5, 2)
-  salePrice            Decimal? @map("sale_price") @db.Decimal(10, 2)
-  powerWatts           Decimal? @map("power_watts") @db.Decimal(8, 2)
-  imageUrl             String?  @map("image_url")
-  stockReady           Int      @default(0) @map("stock_ready")
+  id                    Int      @id @default(autoincrement())
+  name                  String
+  description           String?  @db.Text
+  projectLink           String?  @map("project_link")
+  estimatedWeightG      Decimal  @default(0) @map("estimated_weight_g") @db.Decimal(10, 2)
+  estimatedPrintMinutes Int      @default(0) @map("estimated_print_minutes")
+  recommendedMaterial   String?  @map("recommended_material")
+  recommendedColor      String?  @map("recommended_color")
+  profitMarginPct       Decimal  @default(50) @map("profit_margin_pct") @db.Decimal(5, 2)
+  salePrice             Decimal? @map("sale_price") @db.Decimal(10, 2)
+  powerWatts            Decimal? @map("power_watts") @db.Decimal(8, 2)
+  imageUrl              String?  @map("image_url")
+  stockReady            Int      @default(0) @map("stock_ready")
 
   // Suporte a Multicolor (até 3 cores)
   color1               String?
@@ -160,11 +177,29 @@ model Product {
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
-  productionOrders ProductionOrder[]
-  consignmentItems ConsignmentItem[]
-  saleItems        SaleItem[]
+  plates               ProductPlate[]
+  productionOrders     ProductionOrder[]
+  consignmentItems     ConsignmentItem[]
+  saleItems            SaleItem[]
 
   @@map("products")
+}
+
+model ProductPlate {
+  id                    Int      @id @default(autoincrement())
+  productId             Int      @map("product_id")
+  name                  String
+  estimatedWeightG      Decimal  @map("estimated_weight_g") @db.Decimal(10, 2)
+  estimatedPrintMinutes Int      @map("estimated_print_minutes")
+  materialColorNeeded   String?  @map("material_color_needed")
+  yieldPerCycle         Int      @default(1) @map("yield_per_cycle")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  product               Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  printTasks            PrintTask[]
+
+  @@map("product_plates")
 }
 
 // ============================================
@@ -174,9 +209,11 @@ model Product {
 model ProductionOrder {
   id               Int       @id @default(autoincrement())
   productId        Int       @map("product_id")
-  filamentRollId   Int       @map("filament_roll_id")
-  machineId        Int       @map("machine_id")
+  filamentRollId   Int?      @map("filament_roll_id")
+  machineId        Int?      @map("machine_id")
   status           OrderStatus @default(QUEUED)
+  targetQuantity   Int       @default(1) @map("target_quantity")
+  quantity         Int       @default(1) @map("quantity")
   actualWeightG    Decimal?  @map("actual_weight_g") @db.Decimal(10, 2)
   actualPrintMinutes Int?    @map("actual_print_minutes")
   materialCost     Decimal?  @map("material_cost") @db.Decimal(10, 2)
@@ -184,7 +221,6 @@ model ProductionOrder {
   totalCost        Decimal?  @map("total_cost") @db.Decimal(10, 2)
   notes            String?   @db.Text
   isFailure        Boolean   @default(false) @map("is_failure")
-  quantity           Int       @default(1)
   destinationType    String?   @map("destination_type") // SALES_POINT, DIRECT_SALE, ORDER
   destinationName    String?   @map("destination_name")
   saleId             Int?      @map("sale_id")
@@ -195,17 +231,42 @@ model ProductionOrder {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   product      Product      @relation(fields: [productId], references: [id])
-  filamentRoll FilamentRoll @relation(fields: [filamentRollId], references: [id])
-  machine      Machine      @relation(fields: [machineId], references: [id])
+  filamentRoll FilamentRoll? @relation(fields: [filamentRollId], references: [id])
+  machine      Machine?     @relation(fields: [machineId], references: [id])
   sale         Sale?        @relation(fields: [saleId], references: [id])
   saleItem     SaleItem?    @relation(fields: [saleItemId], references: [id])
+  printTasks   PrintTask[]
 
   @@map("production_orders")
 }
 
+model PrintTask {
+  id                Int         @id @default(autoincrement())
+  productionOrderId Int         @map("production_order_id")
+  productPlateId    Int         @map("product_plate_id")
+  filamentRollId    Int?        @map("filament_roll_id")
+  machineId         Int?        @map("machine_id")
+  status            OrderStatus @default(QUEUED)
+  targetCycles      Int         @map("target_cycles")
+  completedCycles   Int         @default(0) @map("completed_cycles")
+  startedAt         DateTime?   @map("started_at")
+  finishedAt        DateTime?   @map("finished_at")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  productPlate      ProductPlate    @relation(fields: [productPlateId], references: [id])
+  filamentRoll      FilamentRoll?   @relation(fields: [filamentRollId], references: [id])
+  machine           Machine?        @relation(fields: [machineId], references: [id])
+
+  @@map("print_tasks")
+}
+
 enum OrderStatus {
   QUEUED
+  SLICED
   PRINTING
+  POST_PROCESSING
   COMPLETED
   FAILED
 }

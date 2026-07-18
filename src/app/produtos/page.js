@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Package, ExternalLink, Trash2, Edit, X, Palette, Wrench, Layers } from 'lucide-react';
+import { Plus, Package, ExternalLink, Trash2, Edit, X, Palette, Wrench, Layers, FileCode } from 'lucide-react';
 import { formatCurrency, formatWeight, formatDuration, formatPercent } from '@/lib/formatters';
+import { parseGcodeFile } from '@/lib/gcodeParser';
 
 const MATERIALS = ['PLA', 'ABS', 'PETG', 'TPU', 'Nylon', 'Resina', 'ASA', 'PC'];
 
@@ -12,6 +13,8 @@ export default function ProdutosPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [importingGcode, setImportingGcode] = useState(false);
 
   const [form, setForm] = useState({
     name: '', description: '', projectLink: '', estimatedWeightG: '',
@@ -115,6 +118,54 @@ export default function ProdutosPage() {
       setForm({ ...form, plates: nextPlates, estimatedWeightG: totalW, estimatedPrintMinutes: totalT });
     } else {
       setForm({ ...form, plates: nextPlates });
+    }
+  };
+
+  const handleGcodeFiles = async (files) => {
+    if (!files || files.length === 0) return;
+    setImportingGcode(true);
+    try {
+      const parsedList = [];
+      for (const file of Array.from(files)) {
+        if (!file.name.toLowerCase().endsWith('.gcode') && !file.name.toLowerCase().endsWith('.gcode.gz')) {
+          continue;
+        }
+        const parsed = await parseGcodeFile(file);
+        if (parsed) {
+          parsedList.push(parsed);
+        }
+      }
+      if (parsedList.length > 0) {
+        const nextPlates = [...form.plates, ...parsedList];
+        updatePlatesAndTotals(nextPlates);
+      } else {
+        alert('Nenhum arquivo .gcode válido identificado nos itens selecionados.');
+      }
+    } catch (e) {
+      alert('Erro ao ler arquivo G-code em memória. Tente novamente.');
+    } finally {
+      setImportingGcode(false);
+    }
+  };
+
+  const handleDragOverGcode = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleDragLeaveGcode = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+
+  const handleDropGcode = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer && e.dataTransfer.files) {
+      await handleGcodeFiles(e.dataTransfer.files);
     }
   };
 
@@ -290,9 +341,54 @@ export default function ProdutosPage() {
                   <h3 style={{ fontSize: 14, color: '#a855f7', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
                     <Layers size={16} /> Chapas de Impressão (.Gcodes) — BOM
                   </h3>
-                  <button type="button" className="btn btn-sm" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#d8b4fe', border: '1px solid rgba(168, 85, 247, 0.3)' }} onClick={addPlate}>
-                    <Plus size={14} /> Adicionar Chapa
-                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="btn btn-sm" style={{ background: 'rgba(192, 132, 252, 0.2)', color: '#e879f9', border: '1px solid rgba(192, 132, 252, 0.4)', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => document.getElementById('gcode-file-input').click()}>
+                      <FileCode size={14} /> Importar .Gcode
+                    </button>
+                    <button type="button" className="btn btn-sm" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#d8b4fe', border: '1px solid rgba(168, 85, 247, 0.3)' }} onClick={addPlate}>
+                      <Plus size={14} /> Adicionar Chapa
+                    </button>
+                  </div>
+                </div>
+
+                {/* Drag and Drop Zone for G-Code parsing */}
+                <div
+                  onDragOver={handleDragOverGcode}
+                  onDragLeave={handleDragLeaveGcode}
+                  onDrop={handleDropGcode}
+                  style={{
+                    border: dragActive ? '2px dashed #a855f7' : '2px dashed rgba(168, 85, 247, 0.3)',
+                    background: dragActive ? 'rgba(168, 85, 247, 0.15)' : 'rgba(168, 85, 247, 0.04)',
+                    padding: '18px 14px',
+                    borderRadius: 8,
+                    textAlign: 'center',
+                    marginBottom: 16,
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => document.getElementById('gcode-file-input').click()}
+                >
+                  <input
+                    id="gcode-file-input"
+                    type="file"
+                    multiple
+                    accept=".gcode,.gcode.gz"
+                    style={{ display: 'none' }}
+                    onChange={(e) => handleGcodeFiles(e.target.files)}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                    {importingGcode ? (
+                      <div className="spinner" style={{ width: 22, height: 22 }}></div>
+                    ) : (
+                      <FileCode size={26} color="#c084fc" />
+                    )}
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#f3e8ff' }}>
+                      {importingGcode ? 'Lendo arquivos .Gcode em memória e calculando BOM...' : 'Arraste e solte seus arquivos .gcode aqui ou clique para importar'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#c084fc', maxWidth: 480, lineHeight: 1.4 }}>
+                      ⚡ Leitura ultrarrápida no navegador: extrai automaticamente tempo, peso (g) e material dos comentários do Bambu, OrcaSlicer, Prusa e Cura <strong>sem salvar o arquivo pesado no servidor</strong>!
+                    </div>
+                  </div>
                 </div>
 
                 <div style={{ background: 'rgba(168, 85, 247, 0.03)', padding: 12, borderRadius: 8, border: '1px solid rgba(168, 85, 247, 0.15)', marginBottom: 18 }}>

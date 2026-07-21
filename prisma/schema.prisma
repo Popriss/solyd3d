@@ -181,6 +181,7 @@ model Product {
   productionOrders     ProductionOrder[]
   consignmentItems     ConsignmentItem[]
   saleItems            SaleItem[]
+  catalogItems         CatalogItem[]
 
   @@map("products")
 }
@@ -487,4 +488,32 @@ model PurchaseSplit {
   partner  Partner  @relation(fields: [partnerId], references: [id])
 
   @@map("purchase_splits")
+}
+
+// ============================================
+// CATÁLOGO PÚBLICO E EXPORTAÇÃO
+// ============================================
+
+model Catalog {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items     CatalogItem[]
+
+  @@map("catalogs")
+}
+
+model CatalogItem {
+  id        Int      @id @default(autoincrement())
+  catalogId Int      @map("catalog_id")
+  productId Int      @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  catalog   Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("catalog_items")
 }

@@ -13,7 +13,7 @@ const navItems = [
   { section: 'Comercial' },
   { href: '/vendas/pontos', label: 'Pontos de Venda', icon: Store },
   { href: '/vendas', label: 'Vendas Diretas', icon: ShoppingBag },
-  { href: '/admin/catalogos', label: 'Vitrines & Catálogos', icon: BookOpen },
+  { href: '/admin/catalogos', label: 'Catálogos & Vitrines', icon: BookOpen },
   { href: '/remessas', label: 'Remessas / Acertos', icon: Truck },
   { section: 'Operações' },
   { href: '/calculadora', label: 'Calculadora de Impressão', icon: Calculator },
@@ -56,7 +56,7 @@ export default function Sidebar() {
               href={item.href}
               className={`sidebar-link ${isActive ? 'active' : ''}`}
             >
-              <Icon /> {item.label}
+              <Icon size={18} /> {item.label}
             </Link>
           );
         })}

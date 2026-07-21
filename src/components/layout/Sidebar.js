@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   LayoutDashboard, Package, Boxes, Factory, DollarSign,
-  Settings, Printer, Store, ShoppingBag, Users, ShoppingCart, Calculator, Truck
+  Settings, Printer, Store, ShoppingBag, Users, ShoppingCart, Calculator, Truck, BookOpen
 } from 'lucide-react';
 
 const navItems = [
@@ -13,6 +13,7 @@ const navItems = [
   { section: 'Comercial' },
   { href: '/vendas/pontos', label: 'Pontos de Venda', icon: Store },
   { href: '/vendas', label: 'Vendas Diretas', icon: ShoppingBag },
+  { href: '/admin/catalogos', label: 'Vitrines & Catálogos', icon: BookOpen },
   { href: '/remessas', label: 'Remessas / Acertos', icon: Truck },
   { section: 'Operações' },
   { href: '/calculadora', label: 'Calculadora de Impressão', icon: Calculator },

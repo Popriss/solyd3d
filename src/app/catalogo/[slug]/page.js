@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import PrintButton from "./PrintButton";
 
 export default async function CatalogPage({ params }) {
@@ -52,11 +51,10 @@ export default async function CatalogPage({ params }) {
               {/* Imagem do Produto */}
               <div className="aspect-square bg-gray-700 relative print:bg-gray-50 flex items-center justify-center">
                 {item.product.imageUrl ? (
-                  <Image
+                  <img
                     src={item.product.imageUrl}
                     alt={item.product.name}
-                    fill
-                    className="object-cover"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="text-gray-500 print:text-gray-400 text-sm">

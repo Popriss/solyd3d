@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import PrintButton from "./PrintButton";
 
 export default async function CatalogPage({ params }) {
-  const { slug } = params;
+  const { slug } = await params;
 
   // Busca o catálogo e seus itens no banco de dados
   const catalog = await prisma.catalog.findUnique({
